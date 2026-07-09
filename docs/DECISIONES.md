@@ -140,3 +140,23 @@ una simulación en memoria de Sheets (clases MockSheet/MockSpreadsheet en
 habría que fijarla a propósito. La concurrencia real (Caso 4) no es
 simulable localmente: el diseño la cubre con `LockService` + relectura bajo
 bloqueo, y debe verificarse manualmente en la Fase 8 con dos dispositivos.
+
+## D-018 — Escaneo con cámara en tres niveles
+
+El prompt (§12) pide ZXing "o una alternativa técnicamente equivalente".
+Se implementó en cascada: (1) `BarcodeDetector`, API nativa de Chrome
+Android — sin dependencias, más rápida; (2) si no existe, ZXing open source
+cargado desde CDN gratuito (jsDelivr) solo en ese momento; (3) entrada
+manual del código siempre disponible (cámara dañada, sin permiso, código
+ilegible). Riesgo conocido: `getUserMedia` puede fallar dentro del iframe de
+Apps Script en algunos navegadores; el mitigador es abrir la URL de la app
+directamente en Chrome. Verificación real en dispositivo: Fase 8.
+
+## D-019 — "Mis retiros" locales al dispositivo hasta la Fase 7
+
+Sin autenticación aún no se puede filtrar movimientos por usuario en el
+servidor. La pantalla del trabajador guarda los retiros confirmados desde
+ese teléfono en localStorage (máx. 20) y los muestra como "Mis retiros
+recientes (este teléfono)" — el texto es honesto sobre el alcance. En la
+Fase 7 se reemplaza por el filtro por usuario autenticado (movListar ya lo
+soporta).

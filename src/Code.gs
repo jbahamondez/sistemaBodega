@@ -18,6 +18,11 @@ function doGet(e) {
       .setTitle('Ingreso — Sistema Bodega')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
   }
+  if (page === 'retiro') {
+    return HtmlService.createHtmlOutputFromFile('RetiroUi')
+      .setTitle('Retiro — Sistema Bodega')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1, user-scalable=no');
+  }
 
   var estado = codeEstadoFundacion_();
   var html = HtmlService.createHtmlOutput(
@@ -33,7 +38,8 @@ function doGet(e) {
     '<li>Usuarios registrados: ' + estado.usuarios + '</li>' +
     '</ul>' +
     '<p><a href="?page=catalogo">→ Administración del catálogo</a><br>' +
-    '<a href="?page=ingreso">→ Ingreso de mercadería (pistola)</a></p>' +
+    '<a href="?page=ingreso">→ Ingreso de mercadería (pistola)</a><br>' +
+    '<a href="?page=retiro">→ Retiro para reponer tienda (celular)</a></p>' +
     '<p>Las pantallas de ingreso, retiro y consulta se habilitan en las próximas fases.</p>' +
     '</body></html>'
   );

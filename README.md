@@ -48,6 +48,7 @@ src/
   Inventario.gs     Consulta de stock (la escritura solo ocurre vía movimientos)
   Movimientos.gs    Confirmación transaccional: bloqueo → releer → validar → escribir
   IngresoUi.html    Pantalla de ingreso para jefatura (pistola HID, PC)
+  RetiroUi.html     Pantalla de retiro para trabajador (cámara, Android)
   CatalogoUi.html   Interfaz de administración del catálogo (jefatura, PC)
   Code.gs           Punto de entrada web (doGet + routing)
   SelfTest.gs       Pruebas (ejecutables en el editor y localmente con npm test)
@@ -128,6 +129,30 @@ La pantalla de ingreso vive en `?page=ingreso` (PC de jefatura):
   transacción de `movConfirmar` (tipo ENTRADA) con bloqueo y relectura.
 - Código no registrado → mensaje claro y enlace al catálogo para crearlo.
 
+## Retiro para reponer tienda (Fase 5)
+
+La pantalla del trabajador vive en `?page=retiro` (celular Android, botones
+grandes para operar de pie):
+
+- **Flujo**: REGISTRAR RETIRO → ESCANEAR (cámara trasera) → producto
+  detectado con stock disponible → carro con botones +/− → CONFIRMAR RETIRO
+  → aviso "ahora retira físicamente" (§14: el registro precede al retiro
+  físico).
+- **Lector de códigos** en tres niveles: API nativa `BarcodeDetector` de
+  Chrome Android (sin dependencias); si no existe, ZXing (open source) desde
+  CDN gratuito; y siempre entrada manual del código como respaldo.
+- Tras cada lectura: flash verde + vibración + sonido, y debounce de 2,5 s
+  para no duplicar la misma lectura.
+- **Stock insuficiente**: el servidor rechaza el retiro completo, nada
+  cambia y el carro se conserva para corregir (§15).
+- Código no registrado → "Producto no registrado, avisa a jefatura" (el
+  trabajador no puede crear productos, §22).
+- Borrador en localStorage y "Mis retiros recientes" del dispositivo
+  (pasarán a filtrarse por usuario real en la Fase 7).
+
+> Si la cámara no abre dentro del marco de Apps Script, abrir la URL de la
+> aplicación directamente en Chrome (no incrustada) y conceder el permiso.
+
 ## Validación local (desarrollo)
 
 Requiere Node.js. Instalar dependencias una vez con `npm install` y luego:
@@ -160,7 +185,7 @@ símbolos usados entre archivos.
 | 2 | Catálogo: CRUD manual, plantilla, importación con previsualización, exportación, historial | ✅ Completada |
 | 3 | Inventario: consulta y actualización segura con concurrencia | ✅ Completada |
 | 4 | Ingreso de jefatura (pistola HID) | ✅ Completada |
-| 5 | Retiro móvil (cámara Android) | Pendiente |
+| 5 | Retiro móvil (cámara Android) | ✅ Completada |
 | 6 | Panel de jefatura: dashboard, movimientos, trazabilidad | Pendiente |
 | 7 | Usuarios y permisos (validación en servidor) | Pendiente |
 | 8 | Calidad: casos de prueba obligatorios | Pendiente |
