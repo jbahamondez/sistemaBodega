@@ -166,7 +166,8 @@ function runMovimientoTests() {
   }
 
   var resultados = [];
-  var tests = [testMovimientosCasos_, testAuthYPermisos_];
+  var tests = [testMovimientosCasos_, testAuthYPermisos_,
+    testCorreccionCaso6_, testImportacionCasos_];
   tests.forEach(function (t) {
     try {
       t();
@@ -379,6 +380,116 @@ function testAuthYPermisos_() {
   try { apiUsuarioCambiarEstado(sesionJefa.token, sesionJefa.usuario_id, false); }
   catch (e) { lanzo = e.message.indexOf('propia cuenta') !== -1; }
   assert_(lanzo, 'jefatura no puede desactivar su propia cuenta');
+}
+
+/**
+ * Caso 6 (§29): un retiro confirmado por error NO se borra; se registra un
+ * AJUSTE compensatorio y la auditoría muestra ambos movimientos.
+ */
+function testCorreccionCaso6_() {
+  var encontrado = catalogoBuscarPorCodigoBarras_('TEST-UNI-001');
+  var productoId = encontrado.producto.producto_id;
+  var stockInicial = invGetStock_(productoId);
+
+  // Retiro "erróneo" de 30 unidades.
+  var retiroErroneo = movConfirmar_({
+    tipo: 'RETIRO', usuarioNombre: 'Test',
+    items: [{ codigo_barras: 'TEST-UNI-001', cantidad_empaques: 30 }]
+  });
+  assert_(invGetStock_(productoId) === stockInicial - 30, 'retiro erróneo descontó 30');
+
+  // Corrección auditada: AJUSTE +30 con motivo, sin tocar el original.
+  var correccion = movConfirmar_({
+    tipo: 'AJUSTE', usuarioNombre: 'Test',
+    observacion: 'Corrección de retiro erróneo ' + retiroErroneo.movimiento_id,
+    items: [{ codigo_barras: 'TEST-UNI-001', cantidad_empaques: 30 }]
+  });
+  assert_(invGetStock_(productoId) === stockInicial,
+    'Caso 6: el ajuste compensatorio restaura el stock');
+
+  var original = movObtenerDetalle_(retiroErroneo.movimiento_id);
+  assert_(original.cabecera.estado === 'CONFIRMADO',
+    'Caso 6: el movimiento original NO se borró ni modificó');
+  var traza = movTrazabilidadProducto_(productoId);
+  var ids = traza.map(function (t) { return t.movimiento_id; });
+  assert_(ids.indexOf(retiroErroneo.movimiento_id) !== -1 &&
+          ids.indexOf(correccion.movimiento_id) !== -1,
+    'Caso 6: la trazabilidad muestra el error y su corrección');
+}
+
+/**
+ * Casos 7, 8, 9 y 12 (§29): flujo completo de importación de catálogo por
+ * planilla — primera carga, actualización con diff, código duplicado y
+ * registros ausentes que no se tocan.
+ */
+function testImportacionCasos_() {
+  var cab = 'codigo_producto,nombre_producto,categoria,codigo_barras,' +
+    'nombre_formato,tipo_empaque,unidades_por_empaque,activo\n';
+
+  // Caso 7: primera carga con dos productos nuevos.
+  var csv1 = cab +
+    'IMP-001,Choco Import,Chocolates,IMP780111,Display 10,DISPLAY,10,SI\n' +
+    'IMP-002,Bombon Import,Bombones,IMP780222,Caja 24,CAJA,24,SI\n';
+  var prev1 = importacionPrevisualizar_(csv1, 'AGREGAR_Y_ACTUALIZAR');
+  assert_(prev1.ok && prev1.resumen.NUEVO === 2 && prev1.resumen.ERROR === 0,
+    'Caso 7: previsualización clasifica 2 filas nuevas sin errores');
+  var res1 = importacionAplicar_(csv1, 'AGREGAR_Y_ACTUALIZAR', 'primera_carga.csv');
+  assert_(res1.detalle.productosCreados === 2 && res1.detalle.formatosCreados === 2,
+    'Caso 7: la importación crea productos y formatos');
+  assert_(movBuscarCodigo_('IMP780111').encontrado,
+    'Caso 7: el catálogo queda disponible para escanear');
+
+  // Dar stock al producto importado para verificar Caso 8/10.
+  movConfirmar_({ tipo: 'ENTRADA', usuarioNombre: 'Test',
+    items: [{ codigo_barras: 'IMP780111', cantidad_empaques: 1 }] });
+  var productoImp = catalogoBuscarPorCodigoBarras_('IMP780111').producto;
+  assert_(invGetStock_(productoImp.producto_id) === 10, 'stock importado = 10');
+
+  // Caso 8: nueva planilla actualiza 10 → 12; el diff se muestra antes.
+  var csv2 = cab +
+    'IMP-001,Choco Import,Chocolates,IMP780111,Display 10,DISPLAY,12,SI\n';
+  var prev2 = importacionPrevisualizar_(csv2, 'AGREGAR_Y_ACTUALIZAR');
+  var fila = prev2.filas[0];
+  var diffUnidades = fila.cambios.filter(function (c) {
+    return c.campo === 'unidades_por_empaque';
+  })[0];
+  assert_(fila.estado === 'ACTUALIZAR' && diffUnidades &&
+          diffUnidades.anterior === '10' && diffUnidades.nuevo === '12',
+    'Caso 8: la previsualización muestra 10 → 12');
+  importacionAplicar_(csv2, 'AGREGAR_Y_ACTUALIZAR', 'actualizacion.csv');
+  assert_(movBuscarCodigo_('IMP780111').unidades_por_empaque === 12,
+    'Caso 8: los movimientos nuevos usarán 12');
+  assert_(invGetStock_(productoImp.producto_id) === 10,
+    'Caso 8/10: el stock NO cambió por actualizar el catálogo');
+  var trazaImp = movTrazabilidadProducto_(productoImp.producto_id);
+  assert_(trazaImp[0].unidades_por_empaque === 10,
+    'Caso 8: el movimiento histórico conserva el snapshot de 10');
+
+  // Caso 12: IMP-002 no venía en csv2 → permanece intacto y activo.
+  var ausente = movBuscarCodigo_('IMP780222');
+  assert_(ausente.encontrado && ausente.unidades_por_empaque === 24,
+    'Caso 12: el registro ausente de la planilla no se elimina ni desactiva');
+
+  // Caso 9: código duplicado dentro del mismo archivo → error, no importar.
+  var csv3 = cab +
+    'IMP-003,Trufa Import,Chocolates,DUP780999,Display 6,DISPLAY,6,SI\n' +
+    'IMP-004,Trufa Blanca,Chocolates,DUP780999,Display 8,DISPLAY,8,SI\n';
+  var prev3 = importacionPrevisualizar_(csv3, 'AGREGAR_Y_ACTUALIZAR');
+  assert_(prev3.resumen.ERROR === 1 && prev3.resumen.NUEVO === 1,
+    'Caso 9: el duplicado queda marcado como error');
+  var res3 = importacionAplicar_(csv3, 'AGREGAR_Y_ACTUALIZAR', 'duplicados.csv');
+  assert_(res3.filasConError.length === 1,
+    'Caso 9: la fila duplicada se omite e informa');
+  assert_(!movBuscarCodigo_('DUP780999').encontrado ||
+          movBuscarCodigo_('DUP780999').unidades_por_empaque === 6,
+    'Caso 9: nunca quedan dos formatos activos con el mismo código');
+
+  // Modo AGREGAR no debe actualizar existentes (§8.6).
+  var csv4 = cab +
+    'IMP-001,Choco Import,Chocolates,IMP780111,Display 10,DISPLAY,99,SI\n';
+  var prev4 = importacionPrevisualizar_(csv4, 'AGREGAR');
+  assert_(prev4.resumen.OMITIDO_POR_MODO === 1,
+    'modo AGREGAR omite actualizaciones');
 }
 
 /** Integración: requiere setupDatabase() ejecutado. Se omite si no lo está. */

@@ -216,10 +216,11 @@ símbolos usados entre archivos.
 | 5 | Retiro móvil (cámara Android) | ✅ Completada |
 | 6 | Panel de jefatura: dashboard, inventario, movimientos, trazabilidad | ✅ Completada |
 | 7 | Usuarios y permisos (validación en servidor) | ✅ Completada |
-| 8 | Calidad: casos de prueba obligatorios | Pendiente |
+| 8 | Calidad: casos automatizados ✅; checklist manual en docs/PRUEBAS.md | ⚠️ Requiere dispositivos |
 
 ## Documentación adicional
 
 - [docs/DECISIONES.md](docs/DECISIONES.md) — decisiones técnicas y su justificación.
+- [docs/PRUEBAS.md](docs/PRUEBAS.md) — cobertura automatizada y checklist manual de la Fase 8.
 - Documento funcional: `Sistema_Control_y_Trazabilidad_Bodega_Chocolateria.pdf`
   (análisis, reglas de negocio y flujos acordados).
