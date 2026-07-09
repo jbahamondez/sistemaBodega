@@ -1,0 +1,16 @@
+# clasp: contiene scriptId del entorno de cada desarrollador
+.clasp.json
+
+# Credenciales y secretos — nunca subir
+.env
+*.pem
+*.key
+credentials*.json
+token*.json
+
+# Node (si se agrega tooling local en el futuro)
+node_modules/
+
+# Sistema operativo
+Thumbs.db
+.DS_Store
