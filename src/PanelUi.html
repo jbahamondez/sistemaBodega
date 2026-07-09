@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Panel — Sistema Bodega</title>
+<style>
+  :root {
+    --marron: #4e342e; --marron-claro: #6d4c41; --crema: #faf6f1;
+    --ok: #2e7d32; --err: #c62828; --warn: #ef6c00; --gris: #757575;
+    --borde: #e0d7ce;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; margin: 0; background: var(--crema); color: #2b2b2b; }
+  header { background: var(--marron); color: #fff; padding: .8rem 1.2rem;
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 1.15rem; font-weight: 600; }
+  header nav a { color: #ffd9b3; font-size: .85rem; text-decoration: none; margin-left: 1rem; }
+  main { max-width: 1080px; margin: 0 auto; padding: 1rem 1.2rem 3rem; }
+
+  .tabs { display: flex; gap: .4rem; margin: 1rem 0; flex-wrap: wrap; }
+  .tabs button { border: 1px solid var(--borde); background: #fff; padding: .55rem 1.1rem;
+    border-radius: 8px 8px 0 0; cursor: pointer; font-size: .95rem; }
+  .tabs button.activa { background: var(--marron); color: #fff; border-color: var(--marron); }
+  section.tab { display: none; }
+  section.tab.activa { display: block; }
+
+  .panel { background: #fff; border: 1px solid var(--borde); border-radius: 8px;
+    padding: 1rem; margin-bottom: 1rem; }
+  .panel h2 { margin: 0 0 .8rem; font-size: 1.02rem; color: var(--marron); }
+
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: .8rem; margin-bottom: 1rem; }
+  .kpi { background: #fff; border: 1px solid var(--borde); border-radius: 8px;
+    padding: .9rem 1rem; }
+  .kpi strong { display: block; font-size: 1.7rem; color: var(--marron); }
+  .kpi span { font-size: .82rem; color: var(--gris); }
+  .kpi.alerta strong { color: var(--err); }
+  .kpi.aviso strong { color: var(--warn); }
+
+  table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  th, td { text-align: left; padding: .45rem .5rem; border-bottom: 1px solid var(--borde); }
+  th { background: #f3ece4; color: var(--marron); font-weight: 600; }
+  td.num, th.num { text-align: right; }
+  tr.clic { cursor: pointer; }
+  tr.clic:hover td { background: #fdf7ef; }
+
+  .badge { display: inline-block; padding: .1rem .5rem; border-radius: 10px;
+    font-size: .75rem; font-weight: 600; }
+  .badge.ENTRADA { background: #e8f5e9; color: var(--ok); }
+  .badge.RETIRO { background: #fbe9e7; color: var(--err); }
+  .badge.AJUSTE { background: #fff3e0; color: var(--warn); }
+  .badge.REVERSA { background: #ede7f6; color: #5e35b1; }
+
+  .filtros { display: flex; gap: .7rem; flex-wrap: wrap; align-items: end; margin-bottom: .8rem; }
+  .filtros label { display: flex; flex-direction: column; font-size: .8rem;
+    color: var(--marron-claro); gap: .25rem; }
+  .filtros input, .filtros select { padding: .45rem; border: 1px solid var(--borde);
+    border-radius: 6px; font-size: .88rem; }
+  button.accion { border: 1px solid var(--borde); background: #fff; border-radius: 6px;
+    padding: .45rem .9rem; cursor: pointer; font-size: .85rem; }
+  button.accion:hover { background: #f3ece4; }
+  button.primario { background: var(--marron); color: #fff; border: none; border-radius: 6px;
+    padding: .5rem 1.1rem; cursor: pointer; font-size: .88rem; }
+
+  #detalle-mov { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: none;
+    align-items: center; justify-content: center; z-index: 20; padding: 1rem; }
+  #detalle-mov .caja { background: #fff; border-radius: 10px; max-width: 720px; width: 100%;
+    max-height: 85vh; overflow: auto; padding: 1.2rem; }
+  .muted { color: var(--gris); font-size: .85rem; }
+  input.buscar { width: 100%; padding: .5rem; border: 1px solid var(--borde);
+    border-radius: 6px; margin-bottom: .7rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📊 Panel de bodega — Jefatura</h1>
+  <nav>
+    <a href="?page=ingreso">Ingreso</a>
+    <a href="?page=catalogo">Catálogo</a>
+    <a href="?page=retiro">Retiro (móvil)</a>
+  </nav>
+</header>
+
+<main>
+  <div class="tabs">
+    <button id="tabbtn-dashboard" class="activa" onclick="mostrarTab('dashboard')">Dashboard</button>
+    <button id="tabbtn-inventario" onclick="mostrarTab('inventario')">Inventario</button>
+    <button id="tabbtn-movimientos" onclick="mostrarTab('movimientos')">Movimientos</button>
+    <button id="tabbtn-trazabilidad" onclick="mostrarTab('trazabilidad')">Trazabilidad</button>
+  </div>
+
+  <!-- ============================ DASHBOARD ============================ -->
+  <section id="tab-dashboard" class="tab activa">
+    <div class="kpis" id="kpis"><p class="muted">Cargando…</p></div>
+    <div class="panel">
+      <h2>Alertas de stock</h2>
+      <div id="alertas"><p class="muted">Cargando…</p></div>
+    </div>
+    <div class="panel">
+      <h2>Últimos movimientos</h2>
+      <div id="ultimos"><p class="muted">Cargando…</p></div>
+    </div>
+  </section>
+
+  <!-- ============================ INVENTARIO ============================ -->
+  <section id="tab-inventario" class="tab">
+    <div class="panel">
+      <h2>Stock actual de bodega</h2>
+      <input class="buscar" id="buscar-inv" placeholder="Buscar producto o categoría…"
+        oninput="renderInventario()">
+      <div id="lista-inventario"><p class="muted">Cargando…</p></div>
+    </div>
+  </section>
+
+  <!-- =========================== MOVIMIENTOS ============================ -->
+  <section id="tab-movimientos" class="tab">
+    <div class="panel">
+      <h2>Movimientos registrados</h2>
+      <div class="filtros">
+        <label>Desde<input type="date" id="f-desde"></label>
+        <label>Hasta<input type="date" id="f-hasta"></label>
+        <label>Tipo
+          <select id="f-tipo">
+            <option value="">Todos</option>
+            <option>ENTRADA</option><option>RETIRO</option>
+            <option>AJUSTE</option><option>REVERSA</option>
+          </select>
+        </label>
+        <label>Producto
+          <select id="f-producto"><option value="">Todos</option></select>
+        </label>
+        <button class="primario" onclick="cargarMovimientos()">Filtrar</button>
+      </div>
+      <div id="lista-movimientos"><p class="muted">Usa los filtros y presiona Filtrar.</p></div>
+    </div>
+  </section>
+
+  <!-- =========================== TRAZABILIDAD =========================== -->
+  <section id="tab-trazabilidad" class="tab">
+    <div class="panel">
+      <h2>Trazabilidad por producto</h2>
+      <div class="filtros">
+        <label>Producto
+          <select id="t-producto"><option value="">Selecciona…</option></select>
+        </label>
+        <button class="primario" onclick="cargarTrazabilidad()">Ver historial</button>
+      </div>
+      <div id="lista-trazabilidad">
+        <p class="muted">Selecciona un producto para reconstruir su historial completo.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- Modal de detalle de movimiento -->
+<div id="detalle-mov" onclick="if(event.target===this)cerrarDetalle()">
+  <div class="caja">
+    <h2 id="det-titulo" style="color:var(--marron);margin-top:0"></h2>
+    <div id="det-contenido"></div>
+    <p><button class="accion" onclick="cerrarDetalle()">Cerrar</button></p>
+  </div>
+</div>
+
+<script>
+var inventarioCache = [];
+
+function esc(s) {
+  return String(s === null || s === undefined ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+function llamar(fn, args, onOk) {
+  google.script.run
+    .withSuccessHandler(onOk)
+    .withFailureHandler(function (err) { alert('Error: ' + (err.message || err)); })
+    [fn].apply(null, args || []);
+}
+function mostrarTab(nombre) {
+  ['dashboard', 'inventario', 'movimientos', 'trazabilidad'].forEach(function (t) {
+    document.getElementById('tab-' + t).classList.toggle('activa', t === nombre);
+    document.getElementById('tabbtn-' + t).classList.toggle('activa', t === nombre);
+  });
+}
+function tablaMovimientos(movs) {
+  if (!movs.length) return '<p class="muted">Sin movimientos para los filtros elegidos.</p>';
+  var html = '<table><tr><th>ID</th><th>Fecha</th><th>Tipo</th><th>Responsable</th>' +
+    '<th>Origen → Destino</th><th class="num">Empaques</th><th class="num">Unidades</th></tr>';
+  movs.forEach(function (m) {
+    html += '<tr class="clic" onclick="abrirDetalle(\'' + esc(m.movimiento_id) + '\')">' +
+      '<td>' + esc(m.movimiento_id) + '</td><td>' + esc(m.fecha_hora) + '</td>' +
+      '<td><span class="badge ' + esc(m.tipo) + '">' + esc(m.tipo) + '</span></td>' +
+      '<td>' + esc(m.usuario_nombre_snapshot) + '</td>' +
+      '<td>' + esc(m.origen) + ' → ' + esc(m.destino) + '</td>' +
+      '<td class="num">' + esc(m.total_empaques) + '</td>' +
+      '<td class="num">' + esc(m.total_unidades) + '</td></tr>';
+  });
+  return html + '</table><p class="muted">Haz clic en un movimiento para ver su detalle.</p>';
+}
+
+// ------------------------------- dashboard ---------------------------------
+function cargarDashboard() {
+  llamar('panelDashboard', [], function (d) {
+    document.getElementById('kpis').innerHTML =
+      '<div class="kpi"><strong>' + d.total_productos + '</strong>' +
+        '<span>Productos activos</span></div>' +
+      '<div class="kpi"><strong>' + d.stock_total_unidades + '</strong>' +
+        '<span>Unidades en bodega</span></div>' +
+      '<div class="kpi ' + (d.productos_sin_stock.length ? 'alerta' : '') + '"><strong>' +
+        d.productos_sin_stock.length + '</strong><span>Sin stock</span></div>' +
+      '<div class="kpi ' + (d.productos_bajo_minimo.length ? 'aviso' : '') + '"><strong>' +
+        d.productos_bajo_minimo.length + '</strong><span>Bajo mínimo (≤ ' +
+        d.stock_minimo + ')</span></div>';
+
+    var alertas = '';
+    if (d.productos_sin_stock.length) {
+      alertas += '<p style="color:var(--err)"><strong>Agotados:</strong> ' +
+        d.productos_sin_stock.map(function (p) { return esc(p.nombre); }).join(', ') + '</p>';
+    }
+    if (d.productos_bajo_minimo.length) {
+      alertas += '<p style="color:var(--warn)"><strong>Bajo mínimo:</strong> ' +
+        d.productos_bajo_minimo.map(function (p) {
+          return esc(p.nombre) + ' (' + p.stock_unidades + ')';
+        }).join(', ') + '</p>';
+    }
+    document.getElementById('alertas').innerHTML =
+      alertas || '<p class="muted">Sin alertas: todos los productos sobre el mínimo.</p>';
+    document.getElementById('ultimos').innerHTML = tablaMovimientos(d.ultimos_movimientos);
+  });
+}
+
+// ------------------------------- inventario --------------------------------
+function cargarInventario() {
+  llamar('invListar', [], function (r) {
+    inventarioCache = r || [];
+    renderInventario();
+    poblarSelectsProducto();
+  });
+}
+function renderInventario() {
+  var filtro = (document.getElementById('buscar-inv').value || '').toLowerCase();
+  var visibles = inventarioCache.filter(function (p) {
+    return !filtro ||
+      (p.nombre + ' ' + p.categoria + ' ' + p.codigo_producto).toLowerCase().indexOf(filtro) !== -1;
+  });
+  if (!visibles.length) {
+    document.getElementById('lista-inventario').innerHTML =
+      '<p class="muted">Sin productos' + (filtro ? ' para la búsqueda.' : ' en el catálogo.') + '</p>';
+    return;
+  }
+  var html = '<table><tr><th>Producto</th><th>Categoría</th><th class="num">Stock (unid.)</th>' +
+    '<th>≈ En empaques</th><th>Última actualización</th><th></th></tr>';
+  visibles.forEach(function (p) {
+    var eq = p.equivalencias.map(function (f) {
+      return f.empaques_completos + ' ' + esc(f.nombre_formato);
+    }).join(' · ') || '—';
+    html += '<tr><td><strong>' + esc(p.nombre) + '</strong></td>' +
+      '<td>' + esc(p.categoria) + '</td>' +
+      '<td class="num"' + (p.stock_unidades === 0 ? ' style="color:var(--err);font-weight:700"' : '') +
+        '>' + p.stock_unidades + '</td>' +
+      '<td>' + eq + '</td>' +
+      '<td>' + esc(p.updated_at || '—') + '</td>' +
+      '<td><button class="accion" onclick="irATrazabilidad(\'' + esc(p.producto_id) +
+        '\')">Trazabilidad</button></td></tr>';
+  });
+  document.getElementById('lista-inventario').innerHTML = html + '</table>';
+}
+function poblarSelectsProducto() {
+  ['f-producto', 't-producto'].forEach(function (id) {
+    var sel = document.getElementById(id);
+    var actual = sel.value;
+    sel.innerHTML = '<option value="">' +
+      (id === 'f-producto' ? 'Todos' : 'Selecciona…') + '</option>' +
+      inventarioCache.map(function (p) {
+        return '<option value="' + esc(p.producto_id) + '">' + esc(p.nombre) + '</option>';
+      }).join('');
+    sel.value = actual;
+  });
+}
+
+// ------------------------------ movimientos --------------------------------
+function cargarMovimientos() {
+  var filtros = {
+    desde: document.getElementById('f-desde').value,
+    hasta: document.getElementById('f-hasta').value,
+    tipo: document.getElementById('f-tipo').value,
+    productoId: document.getElementById('f-producto').value
+  };
+  document.getElementById('lista-movimientos').innerHTML = '<p class="muted">Buscando…</p>';
+  llamar('movListar', [filtros], function (movs) {
+    document.getElementById('lista-movimientos').innerHTML = tablaMovimientos(movs || []);
+  });
+}
+function abrirDetalle(movimientoId) {
+  llamar('movObtenerDetalle', [movimientoId], function (r) {
+    var m = r.cabecera;
+    document.getElementById('det-titulo').textContent =
+      m.movimiento_id + ' — ' + m.tipo;
+    var html = '<p><strong>Fecha:</strong> ' + esc(m.fecha_hora) +
+      ' · <strong>Responsable:</strong> ' + esc(m.usuario_nombre_snapshot) +
+      ' · <strong>Estado:</strong> ' + esc(m.estado) + '<br>' +
+      '<strong>Origen → Destino:</strong> ' + esc(m.origen) + ' → ' + esc(m.destino) +
+      (m.observacion ? '<br><strong>Observación:</strong> ' + esc(m.observacion) : '') + '</p>';
+    html += '<table><tr><th>Producto</th><th>Formato</th><th>Código</th>' +
+      '<th class="num">Empaques</th><th class="num">Unid./emp.</th>' +
+      '<th class="num">Unidades</th><th class="num">Stock ant. → post.</th></tr>';
+    r.detalles.forEach(function (d) {
+      html += '<tr><td>' + esc(d.producto_nombre_snapshot) + '</td>' +
+        '<td>' + esc(d.formato_nombre_snapshot) + '</td>' +
+        '<td>' + esc(d.codigo_barras_snapshot) + '</td>' +
+        '<td class="num">' + esc(d.cantidad_empaques) + '</td>' +
+        '<td class="num">' + esc(d.unidades_por_empaque_snapshot) + '</td>' +
+        '<td class="num">' + esc(d.total_unidades) + '</td>' +
+        '<td class="num">' + esc(d.stock_anterior) + ' → ' + esc(d.stock_posterior) + '</td></tr>';
+    });
+    document.getElementById('det-contenido').innerHTML = html + '</table>';
+    document.getElementById('detalle-mov').style.display = 'flex';
+  });
+}
+function cerrarDetalle() {
+  document.getElementById('detalle-mov').style.display = 'none';
+}
+
+// ------------------------------ trazabilidad -------------------------------
+function irATrazabilidad(productoId) {
+  mostrarTab('trazabilidad');
+  document.getElementById('t-producto').value = productoId;
+  cargarTrazabilidad();
+}
+function cargarTrazabilidad() {
+  var productoId = document.getElementById('t-producto').value;
+  if (!productoId) {
+    document.getElementById('lista-trazabilidad').innerHTML =
+      '<p class="muted">Selecciona un producto.</p>';
+    return;
+  }
+  document.getElementById('lista-trazabilidad').innerHTML = '<p class="muted">Buscando…</p>';
+  llamar('movTrazabilidadProducto', [productoId], function (hist) {
+    if (!hist || !hist.length) {
+      document.getElementById('lista-trazabilidad').innerHTML =
+        '<p class="muted">Este producto no tiene movimientos registrados.</p>';
+      return;
+    }
+    var html = '<table><tr><th>Movimiento</th><th>Fecha</th><th>Tipo</th><th>Responsable</th>' +
+      '<th>Formato</th><th class="num">Empaques</th><th class="num">Unidades</th>' +
+      '<th class="num">Stock ant. → post.</th></tr>';
+    hist.forEach(function (h) {
+      html += '<tr class="clic" onclick="abrirDetalle(\'' + esc(h.movimiento_id) + '\')">' +
+        '<td>' + esc(h.movimiento_id) + '</td><td>' + esc(h.fecha_hora) + '</td>' +
+        '<td><span class="badge ' + esc(h.tipo) + '">' + esc(h.tipo) + '</span></td>' +
+        '<td>' + esc(h.usuario) + '</td><td>' + esc(h.formato) + '</td>' +
+        '<td class="num">' + h.cantidad_empaques + '</td>' +
+        '<td class="num">' + h.total_unidades + '</td>' +
+        '<td class="num">' + h.stock_anterior + ' → ' + h.stock_posterior + '</td></tr>';
+    });
+    var final = hist[hist.length - 1];
+    document.getElementById('lista-trazabilidad').innerHTML = html + '</table>' +
+      '<p><strong>Stock resultante:</strong> ' + final.stock_posterior + ' unidades.</p>';
+  });
+}
+
+// -------------------------------- arranque ---------------------------------
+cargarDashboard();
+cargarInventario();
+</script>
+</body>
+</html>

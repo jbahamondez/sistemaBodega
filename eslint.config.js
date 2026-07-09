@@ -106,6 +106,8 @@ const projectGlobals = {
   movListar: 'readonly',
   movObtenerDetalle: 'readonly',
   movTrazabilidadProducto: 'readonly',
+  // Panel.gs
+  panelDashboard: 'readonly',
   // Setup.gs
   setupDatabase: 'readonly',
   // SelfTest.gs

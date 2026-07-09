@@ -49,6 +49,8 @@ src/
   Movimientos.gs    Confirmación transaccional: bloqueo → releer → validar → escribir
   IngresoUi.html    Pantalla de ingreso para jefatura (pistola HID, PC)
   RetiroUi.html     Pantalla de retiro para trabajador (cámara, Android)
+  Panel.gs          Agregados del dashboard (totales, alertas de stock)
+  PanelUi.html      Panel de jefatura (dashboard, inventario, movimientos, trazabilidad)
   CatalogoUi.html   Interfaz de administración del catálogo (jefatura, PC)
   Code.gs           Punto de entrada web (doGet + routing)
   SelfTest.gs       Pruebas (ejecutables en el editor y localmente con npm test)
@@ -153,6 +155,21 @@ grandes para operar de pie):
 > Si la cámara no abre dentro del marco de Apps Script, abrir la URL de la
 > aplicación directamente en Chrome (no incrustada) y conceder el permiso.
 
+## Panel de jefatura (Fase 6)
+
+En `?page=panel` (PC), con cuatro pestañas:
+
+- **Dashboard**: productos activos, unidades totales en bodega, agotados y
+  bajo el mínimo (clave `stock_minimo_default` en la hoja Configuracion),
+  más los últimos 10 movimientos.
+- **Inventario**: stock por producto con equivalencia aproximada en
+  empaques ("120 unidades ≈ 8 Display 15"), búsqueda y salto directo a la
+  trazabilidad.
+- **Movimientos**: filtros por fecha, tipo y producto; clic en cualquier
+  fila abre el detalle completo (snapshots, stock anterior → posterior).
+- **Trazabilidad**: historial completo de un producto en orden cronológico,
+  con el stock resultante al final.
+
 ## Validación local (desarrollo)
 
 Requiere Node.js. Instalar dependencias una vez con `npm install` y luego:
@@ -186,7 +203,7 @@ símbolos usados entre archivos.
 | 3 | Inventario: consulta y actualización segura con concurrencia | ✅ Completada |
 | 4 | Ingreso de jefatura (pistola HID) | ✅ Completada |
 | 5 | Retiro móvil (cámara Android) | ✅ Completada |
-| 6 | Panel de jefatura: dashboard, movimientos, trazabilidad | Pendiente |
+| 6 | Panel de jefatura: dashboard, inventario, movimientos, trazabilidad | ✅ Completada |
 | 7 | Usuarios y permisos (validación en servidor) | Pendiente |
 | 8 | Calidad: casos de prueba obligatorios | Pendiente |
 

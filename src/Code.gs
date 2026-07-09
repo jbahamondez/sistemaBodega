@@ -18,6 +18,11 @@ function doGet(e) {
       .setTitle('Ingreso — Sistema Bodega')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
   }
+  if (page === 'panel') {
+    return HtmlService.createHtmlOutputFromFile('PanelUi')
+      .setTitle('Panel — Sistema Bodega')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  }
   if (page === 'retiro') {
     return HtmlService.createHtmlOutputFromFile('RetiroUi')
       .setTitle('Retiro — Sistema Bodega')
@@ -37,7 +42,8 @@ function doGet(e) {
     '<li>Hojas del modelo: ' + estado.hojasExistentes + ' de ' + estado.hojasEsperadas + '</li>' +
     '<li>Usuarios registrados: ' + estado.usuarios + '</li>' +
     '</ul>' +
-    '<p><a href="?page=catalogo">→ Administración del catálogo</a><br>' +
+    '<p><a href="?page=panel">→ Panel de jefatura (dashboard, inventario, trazabilidad)</a><br>' +
+    '<a href="?page=catalogo">→ Administración del catálogo</a><br>' +
     '<a href="?page=ingreso">→ Ingreso de mercadería (pistola)</a><br>' +
     '<a href="?page=retiro">→ Retiro para reponer tienda (celular)</a></p>' +
     '<p>Las pantallas de ingreso, retiro y consulta se habilitan en las próximas fases.</p>' +

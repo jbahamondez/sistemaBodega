@@ -282,6 +282,21 @@ function testMovimientosCasos_() {
   assert_(movBuscarCodigo('NO-EXISTE-999').encontrado === false,
     'movBuscarCodigo indica código no registrado');
 
+  // Panel: dashboard agrega totales y el filtro por producto funciona.
+  var dash = panelDashboard();
+  assert_(dash.total_productos >= 1 && dash.stock_total_unidades >= 118,
+    'dashboard suma productos y unidades');
+  assert_(dash.ultimos_movimientos.length > 0 &&
+          dash.ultimos_movimientos[0].estado === 'CONFIRMADO',
+    'dashboard lista últimos movimientos confirmados');
+  var movsProducto = movListar({ productoId: producto.producto_id });
+  assert_(movsProducto.length >= 4, 'movListar filtra por producto');
+  assert_(movListar({ productoId: 'PROD-INEXISTENTE' }).length === 0,
+    'movListar con producto inexistente devuelve vacío');
+  var traz = movTrazabilidadProducto(producto.producto_id);
+  assert_(traz[traz.length - 1].stock_posterior === 118,
+    'la trazabilidad reconstruye el stock final (118)');
+
   // Código no registrado se rechaza con mensaje claro (§22).
   lanzo = false;
   try {

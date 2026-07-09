@@ -218,15 +218,26 @@ function movResolverItem_(item, tipo, posicion) {
 
 /**
  * Lista movimientos CONFIRMADOS, más recientes primero, con filtros
- * opcionales: { tipo, usuarioId, desde, hasta } (fechas 'yyyy-MM-dd').
+ * opcionales: { tipo, usuarioId, productoId, desde, hasta } (fechas
+ * 'yyyy-MM-dd').
  */
 function movListar(filtros) {
   filtros = filtros || {};
+
+  var conProducto = null;
+  if (filtros.productoId) {
+    conProducto = {};
+    dbFindWhere('MOVIMIENTO_DETALLE', function (d) {
+      return d.producto_id === utilTrim(filtros.productoId);
+    }).forEach(function (d) { conProducto[d.movimiento_id] = true; });
+  }
+
   return dbReadAll('MOVIMIENTOS')
     .filter(function (m) {
       if (m.estado !== CONFIG.ESTADOS_MOVIMIENTO.CONFIRMADO) return false;
       if (filtros.tipo && m.tipo !== utilTrim(filtros.tipo).toUpperCase()) return false;
       if (filtros.usuarioId && m.usuario_id !== utilTrim(filtros.usuarioId)) return false;
+      if (conProducto && !conProducto[m.movimiento_id]) return false;
       var fecha = m.fecha_hora.slice(0, 10);
       if (filtros.desde && fecha < filtros.desde) return false;
       if (filtros.hasta && fecha > filtros.hasta) return false;
