@@ -88,6 +88,7 @@
     <button id="tabbtn-inventario" onclick="mostrarTab('inventario')">Inventario</button>
     <button id="tabbtn-movimientos" onclick="mostrarTab('movimientos')">Movimientos</button>
     <button id="tabbtn-trazabilidad" onclick="mostrarTab('trazabilidad')">Trazabilidad</button>
+    <button id="tabbtn-usuarios" onclick="mostrarTab('usuarios')">Usuarios</button>
   </div>
 
   <!-- ============================ DASHBOARD ============================ -->
@@ -151,6 +152,31 @@
       </div>
     </div>
   </section>
+
+  <!-- ============================= USUARIOS ============================= -->
+  <section id="tab-usuarios" class="tab">
+    <div class="panel">
+      <h2>Crear usuario</h2>
+      <form class="filtros" onsubmit="return crearUsuario(event)">
+        <label>Nombre<input id="u-nombre" required></label>
+        <label>Identificador<input id="u-identificador" required autocapitalize="none"></label>
+        <label>Rol
+          <select id="u-rol">
+            <option>TRABAJADOR</option><option>JEFATURA</option>
+          </select>
+        </label>
+        <label>PIN inicial<input id="u-pin" type="password" inputmode="numeric"
+          minlength="4" required></label>
+        <button type="submit" class="primario">Crear</button>
+      </form>
+      <p class="muted">El PIN se guarda solo como hash con salt; comunícalo al
+        trabajador de forma segura. Los usuarios se desactivan, nunca se eliminan.</p>
+    </div>
+    <div class="panel">
+      <h2>Usuarios registrados</h2>
+      <div id="lista-usuarios"><p class="muted">Cargando…</p></div>
+    </div>
+  </section>
 </main>
 
 <!-- Modal de detalle de movimiento -->
@@ -162,6 +188,8 @@
   </div>
 </div>
 
+<?!= include('SesionParcial'); ?>
+
 <script>
 var inventarioCache = [];
 
@@ -171,16 +199,14 @@ function esc(s) {
     .replace(/"/g, '&quot;');
 }
 function llamar(fn, args, onOk) {
-  google.script.run
-    .withSuccessHandler(onOk)
-    .withFailureHandler(function (err) { alert('Error: ' + (err.message || err)); })
-    [fn].apply(null, args || []);
+  Sesion.api(fn, args, onOk);
 }
 function mostrarTab(nombre) {
-  ['dashboard', 'inventario', 'movimientos', 'trazabilidad'].forEach(function (t) {
+  ['dashboard', 'inventario', 'movimientos', 'trazabilidad', 'usuarios'].forEach(function (t) {
     document.getElementById('tab-' + t).classList.toggle('activa', t === nombre);
     document.getElementById('tabbtn-' + t).classList.toggle('activa', t === nombre);
   });
+  if (nombre === 'usuarios') cargarUsuarios();
 }
 function tablaMovimientos(movs) {
   if (!movs.length) return '<p class="muted">Sin movimientos para los filtros elegidos.</p>';
@@ -200,7 +226,7 @@ function tablaMovimientos(movs) {
 
 // ------------------------------- dashboard ---------------------------------
 function cargarDashboard() {
-  llamar('panelDashboard', [], function (d) {
+  llamar('apiPanelDashboard', [], function (d) {
     document.getElementById('kpis').innerHTML =
       '<div class="kpi"><strong>' + d.total_productos + '</strong>' +
         '<span>Productos activos</span></div>' +
@@ -231,7 +257,7 @@ function cargarDashboard() {
 
 // ------------------------------- inventario --------------------------------
 function cargarInventario() {
-  llamar('invListar', [], function (r) {
+  llamar('apiInvListar', [], function (r) {
     inventarioCache = r || [];
     renderInventario();
     poblarSelectsProducto();
@@ -287,12 +313,12 @@ function cargarMovimientos() {
     productoId: document.getElementById('f-producto').value
   };
   document.getElementById('lista-movimientos').innerHTML = '<p class="muted">Buscando…</p>';
-  llamar('movListar', [filtros], function (movs) {
+  llamar('apiMovListar', [filtros], function (movs) {
     document.getElementById('lista-movimientos').innerHTML = tablaMovimientos(movs || []);
   });
 }
 function abrirDetalle(movimientoId) {
-  llamar('movObtenerDetalle', [movimientoId], function (r) {
+  llamar('apiMovObtenerDetalle', [movimientoId], function (r) {
     var m = r.cabecera;
     document.getElementById('det-titulo').textContent =
       m.movimiento_id + ' — ' + m.tipo;
@@ -321,6 +347,68 @@ function cerrarDetalle() {
   document.getElementById('detalle-mov').style.display = 'none';
 }
 
+// -------------------------------- usuarios ---------------------------------
+function cargarUsuarios() {
+  llamar('apiUsuariosListar', [], function (usuarios) {
+    if (!usuarios || !usuarios.length) {
+      document.getElementById('lista-usuarios').innerHTML =
+        '<p class="muted">Sin usuarios registrados.</p>';
+      return;
+    }
+    var html = '<table><tr><th>ID</th><th>Nombre</th><th>Identificador</th>' +
+      '<th>Rol</th><th>Estado</th><th>Acciones</th></tr>';
+    usuarios.forEach(function (u) {
+      var activo = u.activo === 'SI';
+      html += '<tr><td>' + esc(u.usuario_id) + '</td>' +
+        '<td>' + esc(u.nombre) + '</td>' +
+        '<td>' + esc(u.identificador_acceso) + '</td>' +
+        '<td>' + esc(u.rol) + '</td>' +
+        '<td>' + (activo ? 'ACTIVO' : '<span style="color:var(--err)">INACTIVO</span>') + '</td>' +
+        '<td>' +
+        '<button class="accion" onclick="cambiarEstadoUsuario(\'' + esc(u.usuario_id) +
+          '\',' + !activo + ')">' + (activo ? 'Desactivar' : 'Activar') + '</button>' +
+        '<button class="accion" onclick="cambiarRolUsuario(\'' + esc(u.usuario_id) +
+          '\',\'' + (u.rol === 'JEFATURA' ? 'TRABAJADOR' : 'JEFATURA') + '\')">Rol → ' +
+          (u.rol === 'JEFATURA' ? 'TRABAJADOR' : 'JEFATURA') + '</button>' +
+        '<button class="accion" onclick="resetPinUsuario(\'' + esc(u.usuario_id) +
+          '\',\'' + esc(u.nombre) + '\')">Reset PIN</button>' +
+        '</td></tr>';
+    });
+    document.getElementById('lista-usuarios').innerHTML = html + '</table>';
+  });
+}
+function crearUsuario(ev) {
+  ev.preventDefault();
+  llamar('apiUsuarioCrear', [{
+    nombre: document.getElementById('u-nombre').value,
+    identificador_acceso: document.getElementById('u-identificador').value,
+    rol: document.getElementById('u-rol').value,
+    pin: document.getElementById('u-pin').value
+  }], function (r) {
+    alert('Usuario creado: ' + r.usuario_id + ' (' + r.identificador_acceso + ')');
+    ['u-nombre', 'u-identificador', 'u-pin'].forEach(function (id) {
+      document.getElementById(id).value = '';
+    });
+    cargarUsuarios();
+  });
+  return false;
+}
+function cambiarEstadoUsuario(usuarioId, activar) {
+  if (!activar && !confirm('¿Desactivar este usuario? No podrá iniciar sesión.')) return;
+  llamar('apiUsuarioCambiarEstado', [usuarioId, activar], cargarUsuarios);
+}
+function cambiarRolUsuario(usuarioId, rol) {
+  if (!confirm('¿Cambiar el rol de este usuario a ' + rol + '?')) return;
+  llamar('apiUsuarioCambiarRol', [usuarioId, rol], cargarUsuarios);
+}
+function resetPinUsuario(usuarioId, nombre) {
+  var pin = prompt('Nuevo PIN para ' + nombre + ' (mínimo 4 dígitos):');
+  if (pin === null) return;
+  llamar('apiUsuarioResetPin', [usuarioId, pin], function () {
+    alert('PIN restablecido para ' + nombre + '.');
+  });
+}
+
 // ------------------------------ trazabilidad -------------------------------
 function irATrazabilidad(productoId) {
   mostrarTab('trazabilidad');
@@ -335,7 +423,7 @@ function cargarTrazabilidad() {
     return;
   }
   document.getElementById('lista-trazabilidad').innerHTML = '<p class="muted">Buscando…</p>';
-  llamar('movTrazabilidadProducto', [productoId], function (hist) {
+  llamar('apiMovTrazabilidad', [productoId], function (hist) {
     if (!hist || !hist.length) {
       document.getElementById('lista-trazabilidad').innerHTML =
         '<p class="muted">Este producto no tiene movimientos registrados.</p>';
@@ -360,8 +448,11 @@ function cargarTrazabilidad() {
 }
 
 // -------------------------------- arranque ---------------------------------
-cargarDashboard();
-cargarInventario();
+// El panel es exclusivo de jefatura (§12.4); el servidor revalida cada llamada.
+Sesion.asegurar('JEFATURA', function () {
+  cargarDashboard();
+  cargarInventario();
+});
 </script>
 </body>
 </html>

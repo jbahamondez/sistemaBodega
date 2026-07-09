@@ -98,13 +98,13 @@ function setupRemoveDefaultSheet_(ss) {
 function setupSeedConfig_() {
   Object.keys(CONFIG.IDS).forEach(function (entityKey) {
     var counterKey = CONFIG.IDS[entityKey].counterKey;
-    if (dbGetConfigValue(counterKey) === null) {
-      dbSetConfigValue(counterKey, 0);
+    if (dbGetConfigValue_(counterKey) === null) {
+      dbSetConfigValue_(counterKey, 0);
     }
   });
   Object.keys(CONFIG.DEFAULTS).forEach(function (clave) {
-    if (dbGetConfigValue(clave) === null) {
-      dbSetConfigValue(clave, CONFIG.DEFAULTS[clave]);
+    if (dbGetConfigValue_(clave) === null) {
+      dbSetConfigValue_(clave, CONFIG.DEFAULTS[clave]);
     }
   });
 }
@@ -128,7 +128,7 @@ function setupCrearUsuarioJefatura(nombre, identificadorAcceso, pin) {
     throw new Error('El PIN debe tener al menos 4 dígitos.');
   }
 
-  var existente = dbFindOne('USUARIOS', function (u) {
+  var existente = dbFindOne_('USUARIOS', function (u) {
     return u.identificador_acceso === identificadorAcceso;
   });
   if (existente) {
@@ -139,7 +139,7 @@ function setupCrearUsuarioJefatura(nombre, identificadorAcceso, pin) {
   var salt = utilGenerateSalt();
   var now = utilNow();
   var usuario = {
-    usuario_id: idNext('USUARIO'),
+    usuario_id: idNext_('USUARIO'),
     nombre: utilTrim(nombre),
     identificador_acceso: identificadorAcceso,
     rol: CONFIG.ROLES.JEFATURA,
@@ -149,7 +149,7 @@ function setupCrearUsuarioJefatura(nombre, identificadorAcceso, pin) {
     created_at: now,
     updated_at: now
   };
-  dbAppendRow('USUARIOS', usuario);
+  dbAppendRow_('USUARIOS', usuario);
 
   Logger.log('Usuario de jefatura creado: ' + usuario.usuario_id);
   return usuario.usuario_id;

@@ -139,7 +139,7 @@ function testToCsv_() {
 }
 
 function testPlantillaImportacion_() {
-  var csv = importacionPlantillaCsv();
+  var csv = importacionPlantillaCsv_();
   var parsed = utilParseCsv(csv);
   var headers = parsed.rows[0];
   CONFIG.IMPORT_PLANILLA.columns.forEach(function (col, i) {
@@ -158,7 +158,7 @@ function testPlantillaImportacion_() {
  * editor de Apps Script hay que fijarla a propósito sobre una BD de prueba.
  */
 function runMovimientoTests() {
-  if (dbGetConfigValue('entorno') !== 'TEST') {
+  if (dbGetConfigValue_('entorno') !== 'TEST') {
     throw new Error(
       'runMovimientoTests escribe datos de prueba. Solo se ejecuta si la ' +
       'hoja Configuracion tiene la clave "entorno" con valor "TEST" ' +
@@ -166,7 +166,7 @@ function runMovimientoTests() {
   }
 
   var resultados = [];
-  var tests = [testMovimientosCasos_];
+  var tests = [testMovimientosCasos_, testAuthYPermisos_];
   tests.forEach(function (t) {
     try {
       t();
@@ -185,50 +185,50 @@ function runMovimientoTests() {
 
 function testMovimientosCasos_() {
   // Preparación: producto de prueba con formato unitario y display de 15.
-  var producto = catalogoCrearProducto({
+  var producto = catalogoCrearProducto_({
     nombre: 'TEST Chocolate Bitter', codigo_producto: 'TEST-001',
     categoria: 'Test'
   });
-  catalogoCrearFormato({
+  catalogoCrearFormato_({
     producto_id: producto.producto_id, codigo_barras: 'TEST-UNI-001',
     nombre_formato: 'Unidad', tipo_empaque: 'UNIDAD', unidades_por_empaque: 1
   });
-  var display = catalogoCrearFormato({
+  var display = catalogoCrearFormato_({
     producto_id: producto.producto_id, codigo_barras: 'TEST-DSP-001',
     nombre_formato: 'Display 15', tipo_empaque: 'DISPLAY', unidades_por_empaque: 15
   });
 
   // Stock inicial 100 mediante AJUSTE (todo cambio de stock es un movimiento).
-  movConfirmar({
+  movConfirmar_({
     tipo: 'AJUSTE', usuarioNombre: 'Test', observacion: 'stock inicial de prueba',
     items: [{ codigo_barras: 'TEST-UNI-001', cantidad_empaques: 100 }]
   });
-  assert_(invGetStock(producto.producto_id) === 100, 'stock inicial 100');
+  assert_(invGetStock_(producto.producto_id) === 100, 'stock inicial 100');
 
   // Caso 1: ENTRADA de 2 displays × 15 sobre 100 → 130.
-  var entrada = movConfirmar({
+  var entrada = movConfirmar_({
     tipo: 'ENTRADA', usuarioNombre: 'Test',
     items: [{ codigo_barras: 'TEST-DSP-001', cantidad_empaques: 2 }]
   });
-  assert_(invGetStock(producto.producto_id) === 130, 'Caso 1: 100 + 30 = 130');
-  var detalleEntrada = movObtenerDetalle(entrada.movimiento_id);
+  assert_(invGetStock_(producto.producto_id) === 130, 'Caso 1: 100 + 30 = 130');
+  var detalleEntrada = movObtenerDetalle_(entrada.movimiento_id);
   assert_(detalleEntrada.cabecera.estado === 'CONFIRMADO', 'entrada CONFIRMADA');
   assert_(utilToInt(detalleEntrada.detalles[0].stock_anterior) === 100 &&
           utilToInt(detalleEntrada.detalles[0].stock_posterior) === 130,
     'detalle registra stock anterior 100 y posterior 130');
 
   // Caso 2: RETIRO de 2 displays × 15 sobre 130 → 100.
-  movConfirmar({
+  movConfirmar_({
     tipo: 'RETIRO', usuarioNombre: 'Test',
     items: [{ codigo_barras: 'TEST-DSP-001', cantidad_empaques: 2 }]
   });
-  assert_(invGetStock(producto.producto_id) === 100, 'Caso 2: 130 - 30 = 100');
+  assert_(invGetStock_(producto.producto_id) === 100, 'Caso 2: 130 - 30 = 100');
 
   // Caso 3: RETIRO de 8 displays (120) sobre 100 → rechazado, nada cambia.
-  var movimientosAntes = movListar({}).length;
+  var movimientosAntes = movListar_({}).length;
   var lanzo = false;
   try {
-    movConfirmar({
+    movConfirmar_({
       tipo: 'RETIRO', usuarioNombre: 'Test',
       items: [{ codigo_barras: 'TEST-DSP-001', cantidad_empaques: 8 }]
     });
@@ -238,14 +238,14 @@ function testMovimientosCasos_() {
       'Caso 3: error informa stock insuficiente');
   }
   assert_(lanzo, 'Caso 3: el retiro excedido lanza error');
-  assert_(invGetStock(producto.producto_id) === 100, 'Caso 3: stock intacto en 100');
-  assert_(movListar({}).length === movimientosAntes,
+  assert_(invGetStock_(producto.producto_id) === 100, 'Caso 3: stock intacto en 100');
+  assert_(movListar_({}).length === movimientosAntes,
     'Caso 3: no se registró ningún movimiento confirmado');
 
   // Atomicidad multi-ítem: si un ítem del carro no tiene stock, no se aplica nada.
   lanzo = false;
   try {
-    movConfirmar({
+    movConfirmar_({
       tipo: 'RETIRO', usuarioNombre: 'Test',
       items: [
         { codigo_barras: 'TEST-UNI-001', cantidad_empaques: 10 },
@@ -253,54 +253,54 @@ function testMovimientosCasos_() {
       ]
     });
   } catch (e) { lanzo = true; }
-  assert_(lanzo && invGetStock(producto.producto_id) === 100,
+  assert_(lanzo && invGetStock_(producto.producto_id) === 100,
     'carro con un ítem sin stock: no se confirma parcialmente');
 
   // Caso 5: cambiar el formato 15 → 18 no toca stock ni históricos.
-  catalogoEditarFormato(display.formato_id, { unidades_por_empaque: 18 });
-  assert_(invGetStock(producto.producto_id) === 100,
+  catalogoEditarFormato_(display.formato_id, { unidades_por_empaque: 18 });
+  assert_(invGetStock_(producto.producto_id) === 100,
     'Caso 5/10: editar el catálogo no recalcula stock');
-  var historicos = movTrazabilidadProducto(producto.producto_id);
+  var historicos = movTrazabilidadProducto_(producto.producto_id);
   var conDisplay = historicos.filter(function (h) { return h.formato === 'Display 15'; });
   assert_(conDisplay.length > 0 && conDisplay.every(function (h) {
     return h.unidades_por_empaque === 15;
   }), 'Caso 5: los movimientos históricos conservan el snapshot de 15');
 
   // Y un movimiento nuevo usa la equivalencia vigente (18).
-  movConfirmar({
+  movConfirmar_({
     tipo: 'ENTRADA', usuarioNombre: 'Test',
     items: [{ codigo_barras: 'TEST-DSP-001', cantidad_empaques: 1 }]
   });
-  assert_(invGetStock(producto.producto_id) === 118,
+  assert_(invGetStock_(producto.producto_id) === 118,
     'Caso 5: el movimiento nuevo usa 18 unidades por display (100 + 18)');
 
   // Lookup de escaneo: devuelve producto, formato vigente y stock actual.
-  var lookup = movBuscarCodigo('TEST-DSP-001');
+  var lookup = movBuscarCodigo_('TEST-DSP-001');
   assert_(lookup.encontrado && lookup.producto_nombre === 'TEST Chocolate Bitter' &&
           lookup.unidades_por_empaque === 18 && lookup.stock_unidades === 118,
-    'movBuscarCodigo entrega formato vigente (18) y stock actual (118)');
-  assert_(movBuscarCodigo('NO-EXISTE-999').encontrado === false,
-    'movBuscarCodigo indica código no registrado');
+    'movBuscarCodigo_ entrega formato vigente (18) y stock actual (118)');
+  assert_(movBuscarCodigo_('NO-EXISTE-999').encontrado === false,
+    'movBuscarCodigo_ indica código no registrado');
 
   // Panel: dashboard agrega totales y el filtro por producto funciona.
-  var dash = panelDashboard();
+  var dash = panelDashboard_();
   assert_(dash.total_productos >= 1 && dash.stock_total_unidades >= 118,
     'dashboard suma productos y unidades');
   assert_(dash.ultimos_movimientos.length > 0 &&
           dash.ultimos_movimientos[0].estado === 'CONFIRMADO',
     'dashboard lista últimos movimientos confirmados');
-  var movsProducto = movListar({ productoId: producto.producto_id });
-  assert_(movsProducto.length >= 4, 'movListar filtra por producto');
-  assert_(movListar({ productoId: 'PROD-INEXISTENTE' }).length === 0,
-    'movListar con producto inexistente devuelve vacío');
-  var traz = movTrazabilidadProducto(producto.producto_id);
+  var movsProducto = movListar_({ productoId: producto.producto_id });
+  assert_(movsProducto.length >= 4, 'movListar_ filtra por producto');
+  assert_(movListar_({ productoId: 'PROD-INEXISTENTE' }).length === 0,
+    'movListar_ con producto inexistente devuelve vacío');
+  var traz = movTrazabilidadProducto_(producto.producto_id);
   assert_(traz[traz.length - 1].stock_posterior === 118,
     'la trazabilidad reconstruye el stock final (118)');
 
   // Código no registrado se rechaza con mensaje claro (§22).
   lanzo = false;
   try {
-    movConfirmar({ tipo: 'RETIRO', usuarioNombre: 'Test',
+    movConfirmar_({ tipo: 'RETIRO', usuarioNombre: 'Test',
       items: [{ codigo_barras: 'NO-EXISTE-999', cantidad_empaques: 1 }] });
   } catch (e) {
     lanzo = e.message.indexOf('Código no registrado') !== -1;
@@ -308,18 +308,91 @@ function testMovimientosCasos_() {
   assert_(lanzo, 'código desconocido rechazado con mensaje claro');
 }
 
+/**
+ * Autenticación y matriz de permisos (§12.4, §24). Depende de los datos
+ * creados por testMovimientosCasos_ (formato TEST-DSP-001 con stock 118).
+ */
+function testAuthYPermisos_() {
+  usuarioCrear_({ nombre: 'Jefa Test', identificador_acceso: 'jefa.test',
+    rol: 'JEFATURA', pin: '1234' });
+  var trabCreado = usuarioCrear_({ nombre: 'Trabajador Test',
+    identificador_acceso: 'trab.test', rol: 'TRABAJADOR', pin: '5678' });
+
+  // PIN incorrecto rechazado sin revelar si el usuario existe.
+  var lanzo = false;
+  try { apiLogin('jefa.test', '0000'); }
+  catch (e) { lanzo = e.message.indexOf('incorrecto') !== -1; }
+  assert_(lanzo, 'PIN incorrecto rechazado');
+
+  var sesionJefa = apiLogin('jefa.test', '1234');
+  assert_(sesionJefa.token && sesionJefa.rol === 'JEFATURA', 'login de jefatura entrega token y rol');
+  var sesionTrab = apiLogin('trab.test', '5678');
+  assert_(apiSesionInfo(sesionTrab.token).usuario_id === trabCreado.usuario_id,
+    'apiSesionInfo restaura la sesión');
+
+  // El trabajador NO accede a operaciones de jefatura (validación en servidor).
+  lanzo = false;
+  try { apiPanelDashboard(sesionTrab.token); }
+  catch (e) { lanzo = e.message.indexOf('No autorizado') !== -1; }
+  assert_(lanzo, 'trabajador bloqueado del panel de jefatura');
+  lanzo = false;
+  try {
+    apiIngresoConfirmar(sesionTrab.token,
+      { items: [{ codigo_barras: 'TEST-DSP-001', cantidad_empaques: 1 }] });
+  } catch (e) { lanzo = e.message.indexOf('No autorizado') !== -1; }
+  assert_(lanzo, 'trabajador no puede registrar entradas');
+  lanzo = false;
+  try { apiUsuariosListar(sesionTrab.token); }
+  catch (e) { lanzo = e.message.indexOf('No autorizado') !== -1; }
+  assert_(lanzo, 'trabajador no administra usuarios');
+
+  // El trabajador SÍ retira, y queda como responsable del movimiento.
+  var retiro = apiRetiroConfirmar(sesionTrab.token,
+    { items: [{ codigo_barras: 'TEST-DSP-001', cantidad_empaques: 1 }] });
+  var detalle = movObtenerDetalle_(retiro.movimiento_id);
+  assert_(detalle.cabecera.usuario_id === trabCreado.usuario_id &&
+          detalle.cabecera.usuario_nombre_snapshot === 'Trabajador Test',
+    'el retiro registra al usuario autenticado como responsable');
+
+  // "Mis movimientos" filtra por el usuario de la sesión.
+  var mios = apiMisMovimientos(sesionTrab.token);
+  assert_(mios.length === 1 && mios[0].movimiento_id === retiro.movimiento_id,
+    'apiMisMovimientos devuelve solo los movimientos propios');
+
+  // Token inválido rechazado.
+  lanzo = false;
+  try { apiSesionInfo('token-invalido'); }
+  catch (e) { lanzo = e.message.indexOf('Sesión expirada') !== -1; }
+  assert_(lanzo, 'token inválido rechazado');
+
+  // Un usuario desactivado no puede operar aunque conserve su token.
+  usuarioCambiarEstado_(trabCreado.usuario_id, false);
+  lanzo = false;
+  try {
+    apiRetiroConfirmar(sesionTrab.token,
+      { items: [{ codigo_barras: 'TEST-DSP-001', cantidad_empaques: 1 }] });
+  } catch (e) { lanzo = e.message.indexOf('inactivo') !== -1; }
+  assert_(lanzo, 'usuario desactivado bloqueado aunque tenga token vigente');
+
+  // Jefatura no puede desactivarse a sí misma.
+  lanzo = false;
+  try { apiUsuarioCambiarEstado(sesionJefa.token, sesionJefa.usuario_id, false); }
+  catch (e) { lanzo = e.message.indexOf('propia cuenta') !== -1; }
+  assert_(lanzo, 'jefatura no puede desactivar su propia cuenta');
+}
+
 /** Integración: requiere setupDatabase() ejecutado. Se omite si no lo está. */
 function testIdGenerationIntegration_() {
   try {
-    dbGetSpreadsheet();
+    dbGetSpreadsheet_();
   } catch (e) {
     Logger.log('testIdGenerationIntegration_ omitido: base de datos no configurada.');
     return;
   }
-  var a = idNext('PRODUCTO');
-  var b = idNext('PRODUCTO');
+  var a = idNext_('PRODUCTO');
+  var b = idNext_('PRODUCTO');
   assert_(/^PROD-\d{4,}$/.test(a), 'formato de ID de producto: ' + a);
   assert_(a !== b, 'IDs consecutivos distintos');
-  var lote = idNextBatch('DETALLE', 3);
+  var lote = idNextBatch_('DETALLE', 3);
   assert_(lote.length === 3 && lote[0] !== lote[2], 'lote de IDs consecutivos');
 }

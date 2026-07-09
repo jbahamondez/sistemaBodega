@@ -1,32 +1,31 @@
 /**
- * Code.gs — Punto de entrada de la aplicación web.
+ * Code.gs — Punto de entrada de la aplicación web y routing de páginas.
  *
- * En la Fase 1 sirve una página de estado que confirma que la fundación está
- * operativa. Las interfaces de jefatura (PC) y trabajador (Android) se
- * agregan en las fases 4 a 6.
+ * Las páginas se sirven como plantillas para poder insertar el parcial de
+ * sesión compartido (SesionParcial.html) con <?!= include('...'); ?>.
+ * La autorización real ocurre en el servidor (Api.gs); el login del cliente
+ * solo gestiona el token.
  */
+
+/** Inserta un archivo HTML parcial dentro de una plantilla. */
+function include(nombre) {
+  return HtmlService.createHtmlOutputFromFile(nombre).getContent();
+}
 
 function doGet(e) {
   var page = e && e.parameter && e.parameter.page;
-  if (page === 'catalogo') {
-    return HtmlService.createHtmlOutputFromFile('CatalogoUi')
-      .setTitle('Catálogo — Sistema Bodega')
+  var paginas = {
+    catalogo: { archivo: 'CatalogoUi', titulo: 'Catálogo — Sistema Bodega' },
+    ingreso: { archivo: 'IngresoUi', titulo: 'Ingreso — Sistema Bodega' },
+    panel: { archivo: 'PanelUi', titulo: 'Panel — Sistema Bodega' },
+    retiro: { archivo: 'RetiroUi', titulo: 'Retiro — Sistema Bodega' }
+  };
+
+  if (paginas[page]) {
+    return HtmlService.createTemplateFromFile(paginas[page].archivo)
+      .evaluate()
+      .setTitle(paginas[page].titulo)
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-  }
-  if (page === 'ingreso') {
-    return HtmlService.createHtmlOutputFromFile('IngresoUi')
-      .setTitle('Ingreso — Sistema Bodega')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-  }
-  if (page === 'panel') {
-    return HtmlService.createHtmlOutputFromFile('PanelUi')
-      .setTitle('Panel — Sistema Bodega')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
-  }
-  if (page === 'retiro') {
-    return HtmlService.createHtmlOutputFromFile('RetiroUi')
-      .setTitle('Retiro — Sistema Bodega')
-      .addMetaTag('viewport', 'width=device-width, initial-scale=1, user-scalable=no');
   }
 
   var estado = codeEstadoFundacion_();
@@ -36,7 +35,6 @@ function doGet(e) {
     '<title>Sistema Bodega</title></head>' +
     '<body style="font-family:sans-serif;max-width:640px;margin:2rem auto;padding:0 1rem">' +
     '<h1>Sistema de Control y Trazabilidad de Bodega</h1>' +
-    '<p><strong>Estado:</strong> Fase 1 (fundación) desplegada.</p>' +
     '<ul>' +
     '<li>Base de datos configurada: ' + (estado.baseDatosConfigurada ? 'Sí' : 'No — ejecutar setupDatabase()') + '</li>' +
     '<li>Hojas del modelo: ' + estado.hojasExistentes + ' de ' + estado.hojasEsperadas + '</li>' +
@@ -46,7 +44,6 @@ function doGet(e) {
     '<a href="?page=catalogo">→ Administración del catálogo</a><br>' +
     '<a href="?page=ingreso">→ Ingreso de mercadería (pistola)</a><br>' +
     '<a href="?page=retiro">→ Retiro para reponer tienda (celular)</a></p>' +
-    '<p>Las pantallas de ingreso, retiro y consulta se habilitan en las próximas fases.</p>' +
     '</body></html>'
   );
   html.setTitle('Sistema Bodega');
@@ -62,12 +59,12 @@ function codeEstadoFundacion_() {
     usuarios: 0
   };
   try {
-    var ss = dbGetSpreadsheet();
+    var ss = dbGetSpreadsheet_();
     estado.baseDatosConfigurada = true;
     Object.keys(CONFIG.SHEETS).forEach(function (key) {
       if (ss.getSheetByName(CONFIG.SHEETS[key].name)) estado.hojasExistentes++;
     });
-    estado.usuarios = dbReadAll('USUARIOS').length;
+    estado.usuarios = dbReadAll_('USUARIOS').length;
   } catch (err) {
     // Sin configurar: la página de estado lo informa.
   }

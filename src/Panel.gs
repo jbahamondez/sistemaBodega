@@ -7,9 +7,9 @@
  * configurado (clave stock_minimo_default en Configuracion) y últimos
  * movimientos confirmados.
  */
-function panelDashboard() {
-  var stockMinimo = utilToInt(dbGetConfigValue('stock_minimo_default', '10')) || 0;
-  var inventario = invListar();
+function panelDashboard_() {
+  var stockMinimo = utilToInt(dbGetConfigValue_('stock_minimo_default', '10')) || 0;
+  var inventario = invListar_();
 
   var stockTotal = 0;
   var sinStock = [];
@@ -30,6 +30,6 @@ function panelDashboard() {
     stock_total_unidades: stockTotal,
     productos_sin_stock: sinStock,
     productos_bajo_minimo: bajoMinimo,
-    ultimos_movimientos: movListar({}).slice(0, 10)
+    ultimos_movimientos: movListar_({}).slice(0, 10)
   };
 }

@@ -4,12 +4,12 @@
  * El inventario es una VISTA optimizada del estado actual: la fuente de
  * auditoría son Movimientos + MovimientoDetalle (§19). Este módulo solo lee;
  * la única escritura (invActualizarStock_) ocurre dentro de la transacción
- * de movConfirmar, bajo bloqueo. Nada más debe modificar la hoja Inventario.
+ * de movConfirmar_, bajo bloqueo. Nada más debe modificar la hoja Inventario.
  */
 
 /** Stock actual en unidades de un producto (0 si nunca tuvo movimientos). */
-function invGetStock(productoId) {
-  var fila = dbFindById('INVENTARIO', productoId);
+function invGetStock_(productoId) {
+  var fila = dbFindById_('INVENTARIO', productoId);
   return fila ? (utilToInt(fila.stock_unidades) || 0) : 0;
 }
 
@@ -17,17 +17,17 @@ function invGetStock(productoId) {
  * Inventario completo para consulta: producto, stock en unidades,
  * equivalencia aproximada por cada formato activo y última actualización.
  */
-function invListar() {
+function invListar_() {
   var inventario = {};
-  dbReadAll('INVENTARIO').forEach(function (i) { inventario[i.producto_id] = i; });
+  dbReadAll_('INVENTARIO').forEach(function (i) { inventario[i.producto_id] = i; });
 
   var formatosPorProducto = {};
-  dbReadAll('FORMATOS_EMPAQUE').forEach(function (f) {
+  dbReadAll_('FORMATOS_EMPAQUE').forEach(function (f) {
     if (!utilToBool(f.activo)) return;
     (formatosPorProducto[f.producto_id] = formatosPorProducto[f.producto_id] || []).push(f);
   });
 
-  return dbReadAll('PRODUCTOS')
+  return dbReadAll_('PRODUCTOS')
     .filter(function (p) { return utilToBool(p.activo); })
     .map(function (p) {
       var inv = inventario[p.producto_id];
@@ -56,23 +56,23 @@ function invListar() {
 
 /**
  * INTERNA — escribe el stock de un producto. Solo debe invocarse desde
- * movConfirmar, dentro del bloqueo de la transacción. Crea la fila de
+ * movConfirmar_, dentro del bloqueo de la transacción. Crea la fila de
  * inventario si el producto nunca tuvo stock.
  */
 function invActualizarStock_(productoId, nuevoStock, usuarioId) {
   if (nuevoStock < 0) {
-    // Defensa en profundidad: movConfirmar ya validó. Nunca stock negativo.
+    // Defensa en profundidad: movConfirmar_ ya validó. Nunca stock negativo.
     throw new Error('Stock negativo no permitido para ' + productoId + '.');
   }
-  var fila = dbFindById('INVENTARIO', productoId);
+  var fila = dbFindById_('INVENTARIO', productoId);
   if (fila) {
-    dbUpdateRowByIndex('INVENTARIO', fila._rowIndex, {
+    dbUpdateRowByIndex_('INVENTARIO', fila._rowIndex, {
       stock_unidades: nuevoStock,
       updated_at: utilNow(),
       updated_by: usuarioId
     });
   } else {
-    dbAppendRow('INVENTARIO', {
+    dbAppendRow_('INVENTARIO', {
       producto_id: productoId,
       stock_unidades: nuevoStock,
       updated_at: utilNow(),

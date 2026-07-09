@@ -11,14 +11,14 @@
  */
 
 /** Genera la plantilla oficial CSV con encabezados y filas de ejemplo. */
-function importacionPlantillaCsv() {
+function importacionPlantillaCsv_() {
   var headers = CONFIG.IMPORT_PLANILLA.columns.map(function (c) { return c.header; });
   var filas = [headers].concat(CONFIG.IMPORT_PLANILLA.exampleRows);
   return utilToCsv(filas);
 }
 
 /** Instrucciones de llenado mostradas junto a la plantilla. */
-function importacionInstrucciones() {
+function importacionInstrucciones_() {
   return [
     'Una fila por FORMATO de empaque. Si un producto tiene varios formatos ' +
       '(display, caja, unidad), repetir los datos del producto en cada fila.',
@@ -44,7 +44,7 @@ function importacionInstrucciones() {
  * OMITIDO_POR_MODO), los datos leídos, los cambios detectados campo a campo
  * ("15 → 18") y los errores de esa fila.
  */
-function importacionPrevisualizar(csvText, modo) {
+function importacionPrevisualizar_(csvText, modo) {
   modo = utilTrim(modo).toUpperCase() || CONFIG.MODOS_IMPORTACION.AGREGAR_Y_ACTUALIZAR;
   if (!CONFIG.MODOS_IMPORTACION[modo]) {
     throw new Error('Modo de importación inválido: ' + modo);
@@ -72,8 +72,8 @@ function importacionPrevisualizar(csvText, modo) {
   }
 
   // Estado actual del catálogo para clasificar contra él.
-  var productos = dbReadAll('PRODUCTOS');
-  var formatos = dbReadAll('FORMATOS_EMPAQUE');
+  var productos = dbReadAll_('PRODUCTOS');
+  var formatos = dbReadAll_('FORMATOS_EMPAQUE');
   var formatoPorCodigo = {};
   formatos.forEach(function (f) { formatoPorCodigo[f.codigo_barras] = f; });
   var productoPorId = {};
@@ -171,7 +171,7 @@ function importacionPrevisualizar(csvText, modo) {
  * y confirmar), aplica solo filas NUEVO/ACTUALIZAR y registra el resultado
  * en la hoja Importaciones. Las filas con error se omiten y se informan.
  */
-function importacionAplicar(csvText, modo, nombreArchivo, usuarioId) {
+function importacionAplicar_(csvText, modo, nombreArchivo, usuarioId) {
   usuarioId = usuarioId || CONFIG.USUARIO_PENDIENTE_AUTH;
   var origen = CONFIG.ORIGENES_CAMBIO.IMPORTACION_PLANILLA;
 
@@ -180,7 +180,7 @@ function importacionAplicar(csvText, modo, nombreArchivo, usuarioId) {
     throw new Error('El sistema está procesando otra operación. Intenta nuevamente.');
   }
   try {
-    var prev = importacionPrevisualizar(csvText, modo);
+    var prev = importacionPrevisualizar_(csvText, modo);
     if (!prev.ok) {
       throw new Error('La planilla tiene errores de estructura: ' +
         prev.erroresGlobales.join(' '));
@@ -201,7 +201,7 @@ function importacionAplicar(csvText, modo, nombreArchivo, usuarioId) {
     });
 
     var registro = {
-      importacion_id: idNext('IMPORTACION'),
+      importacion_id: idNext_('IMPORTACION'),
       fecha_hora: utilNow(),
       usuario_id: usuarioId,
       nombre_archivo: utilTrim(nombreArchivo) || 'sin nombre',
@@ -212,7 +212,7 @@ function importacionAplicar(csvText, modo, nombreArchivo, usuarioId) {
       errores: prev.resumen.ERROR,
       estado: 'COMPLETADA'
     };
-    dbAppendRow('IMPORTACIONES', registro);
+    dbAppendRow_('IMPORTACIONES', registro);
 
     return {
       importacion_id: registro.importacion_id,
@@ -228,8 +228,8 @@ function importacionAplicar(csvText, modo, nombreArchivo, usuarioId) {
 }
 
 /** Últimas importaciones registradas, más recientes primero. */
-function importacionListar(limite) {
-  var rows = dbReadAll('IMPORTACIONES');
+function importacionListar_(limite) {
+  var rows = dbReadAll_('IMPORTACIONES');
   rows.reverse();
   return rows.slice(0, limite || 20);
 }
@@ -317,7 +317,7 @@ function importacionAplicarNuevo_(fila, creadosPorIdentidad, contadores, origen,
 
   var productoId = fila.productoExistente || creadosPorIdentidad[identidad] || null;
   if (!productoId) {
-    var producto = catalogoCrearProducto({
+    var producto = catalogoCrearProducto_({
       codigo_producto: datos.codigo_producto,
       nombre: datos.nombre_producto,
       categoria: datos.categoria
@@ -327,7 +327,7 @@ function importacionAplicarNuevo_(fila, creadosPorIdentidad, contadores, origen,
     contadores.productosCreados++;
   }
 
-  var formato = catalogoCrearFormato({
+  var formato = catalogoCrearFormato_({
     producto_id: productoId,
     codigo_barras: datos.codigo_barras,
     nombre_formato: datos.nombre_formato,
@@ -337,13 +337,13 @@ function importacionAplicarNuevo_(fila, creadosPorIdentidad, contadores, origen,
   contadores.formatosCreados++;
 
   if (datos.activo === CONFIG.BOOL.NO) {
-    catalogoCambiarEstado('FORMATO', formato.formato_id, false, true, origen, usuarioId);
+    catalogoCambiarEstado_('FORMATO', formato.formato_id, false, true, origen, usuarioId);
   }
 }
 
 /** Aplica los cambios detectados de una fila ACTUALIZAR. */
 function importacionAplicarActualizacion_(fila, contadores, origen, usuarioId) {
-  var formato = dbFindOne('FORMATOS_EMPAQUE', function (f) {
+  var formato = dbFindOne_('FORMATOS_EMPAQUE', function (f) {
     return f.codigo_barras === fila.datos.codigo_barras;
   });
   if (!formato) return; // desapareció entre previsualización y confirmación
@@ -360,20 +360,20 @@ function importacionAplicarActualizacion_(fila, contadores, origen, usuarioId) {
 
   var formatoActualizado = false;
   if (Object.keys(patchFormato).length > 0) {
-    catalogoEditarFormato(formato.formato_id, patchFormato, origen, usuarioId);
+    catalogoEditarFormato_(formato.formato_id, patchFormato, origen, usuarioId);
     formatoActualizado = true;
   }
   var cambioActivo = fila.cambios.filter(function (c) {
     return c.entidad === 'FORMATO' && c.campo === 'activo';
   })[0];
   if (cambioActivo) {
-    catalogoCambiarEstado('FORMATO', formato.formato_id,
+    catalogoCambiarEstado_('FORMATO', formato.formato_id,
       cambioActivo.nuevo === CONFIG.BOOL.SI, true, origen, usuarioId);
     formatoActualizado = true;
   }
   if (formatoActualizado) contadores.formatosActualizados++;
   if (Object.keys(patchProducto).length > 0) {
-    catalogoEditarProducto(formato.producto_id, patchProducto, origen, usuarioId);
+    catalogoEditarProducto_(formato.producto_id, patchProducto, origen, usuarioId);
     contadores.productosActualizados++;
   }
 }

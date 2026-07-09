@@ -2,7 +2,7 @@
  * Movimientos.gs — Confirmación transaccional de movimientos de inventario.
  *
  * Es el ÚNICO camino por el que cambia el stock (regla de negocio nº 1).
- * ENTRADA (Fase 4), RETIRO (Fase 5), AJUSTE y REVERSA usan movConfirmar.
+ * ENTRADA (Fase 4), RETIRO (Fase 5), AJUSTE y REVERSA usan movConfirmar_.
  *
  * Secuencia obligatoria (§5, §15):
  *   1. Obtener bloqueo.
@@ -35,7 +35,7 @@
  * Devuelve { movimiento_id, tipo, total_unidades, detalles } o lanza Error
  * sin haber modificado nada.
  */
-function movConfirmar(datos) {
+function movConfirmar_(datos) {
   var tipo = utilTrim(datos.tipo).toUpperCase();
   if (!valIsTipoMovimiento(tipo)) {
     throw new Error('Tipo de movimiento inválido: "' + datos.tipo + '".');
@@ -62,7 +62,7 @@ function movConfirmar(datos) {
     var stockPorProducto = {};
     items.forEach(function (it) {
       if (stockPorProducto[it.producto_id] === undefined) {
-        stockPorProducto[it.producto_id] = invGetStock(it.producto_id);
+        stockPorProducto[it.producto_id] = invGetStock_(it.producto_id);
       }
     });
 
@@ -87,7 +87,7 @@ function movConfirmar(datos) {
     }
 
     // --- 4. Escritura en orden seguro --------------------------------------
-    var movimientoId = idNext('MOVIMIENTO');
+    var movimientoId = idNext_('MOVIMIENTO');
     var ahora = utilNow();
     var totalEmpaques = 0;
     var totalUnidades = 0;
@@ -96,7 +96,7 @@ function movConfirmar(datos) {
       totalUnidades += Math.abs(it.delta_unidades);
     });
 
-    dbAppendRow('MOVIMIENTOS', {
+    dbAppendRow_('MOVIMIENTOS', {
       movimiento_id: movimientoId,
       tipo: tipo,
       estado: CONFIG.ESTADOS_MOVIMIENTO.EN_PROCESO,
@@ -111,8 +111,8 @@ function movConfirmar(datos) {
       total_unidades: totalUnidades
     });
 
-    var detalleIds = idNextBatch('DETALLE', items.length);
-    dbAppendRows('MOVIMIENTO_DETALLE', items.map(function (it, i) {
+    var detalleIds = idNextBatch_('DETALLE', items.length);
+    dbAppendRows_('MOVIMIENTO_DETALLE', items.map(function (it, i) {
       return {
         detalle_id: detalleIds[i],
         movimiento_id: movimientoId,
@@ -133,7 +133,7 @@ function movConfirmar(datos) {
       invActualizarStock_(pid, stockSimulado[pid], usuarioId);
     });
 
-    dbUpdateById('MOVIMIENTOS', movimientoId, {
+    dbUpdateById_('MOVIMIENTOS', movimientoId, {
       estado: CONFIG.ESTADOS_MOVIMIENTO.CONFIRMADO
     });
 
@@ -164,8 +164,8 @@ function movConfirmar(datos) {
  * ingreso, cámara en retiro). Devuelve el producto, el formato y el stock
  * actual, o { encontrado: false } si el código no está registrado (§22).
  */
-function movBuscarCodigo(codigoBarras) {
-  var resultado = catalogoBuscarPorCodigoBarras(codigoBarras);
+function movBuscarCodigo_(codigoBarras) {
+  var resultado = catalogoBuscarPorCodigoBarras_(codigoBarras);
   if (!resultado) {
     return { encontrado: false, codigo_barras: utilNormalizeBarcode(codigoBarras) };
   }
@@ -178,7 +178,7 @@ function movBuscarCodigo(codigoBarras) {
     formato_nombre: resultado.formato.nombre_formato,
     tipo_empaque: resultado.formato.tipo_empaque,
     unidades_por_empaque: utilToInt(resultado.formato.unidades_por_empaque),
-    stock_unidades: invGetStock(resultado.producto.producto_id)
+    stock_unidades: invGetStock_(resultado.producto.producto_id)
   };
 }
 
@@ -194,7 +194,7 @@ function movResolverItem_(item, tipo, posicion) {
     throw new Error('Ítem ' + posicion + ': la cantidad debe ser mayor que 0 en ' + tipo + '.');
   }
 
-  var encontrado = catalogoBuscarPorCodigoBarras(item.codigo_barras);
+  var encontrado = catalogoBuscarPorCodigoBarras_(item.codigo_barras);
   if (!encontrado) {
     throw new Error('Código no registrado: "' +
       utilNormalizeBarcode(item.codigo_barras) + '".');
@@ -221,18 +221,18 @@ function movResolverItem_(item, tipo, posicion) {
  * opcionales: { tipo, usuarioId, productoId, desde, hasta } (fechas
  * 'yyyy-MM-dd').
  */
-function movListar(filtros) {
+function movListar_(filtros) {
   filtros = filtros || {};
 
   var conProducto = null;
   if (filtros.productoId) {
     conProducto = {};
-    dbFindWhere('MOVIMIENTO_DETALLE', function (d) {
+    dbFindWhere_('MOVIMIENTO_DETALLE', function (d) {
       return d.producto_id === utilTrim(filtros.productoId);
     }).forEach(function (d) { conProducto[d.movimiento_id] = true; });
   }
 
-  return dbReadAll('MOVIMIENTOS')
+  return dbReadAll_('MOVIMIENTOS')
     .filter(function (m) {
       if (m.estado !== CONFIG.ESTADOS_MOVIMIENTO.CONFIRMADO) return false;
       if (filtros.tipo && m.tipo !== utilTrim(filtros.tipo).toUpperCase()) return false;
@@ -247,10 +247,10 @@ function movListar(filtros) {
 }
 
 /** Cabecera + detalles de un movimiento específico. */
-function movObtenerDetalle(movimientoId) {
-  var cabecera = dbFindById('MOVIMIENTOS', movimientoId);
+function movObtenerDetalle_(movimientoId) {
+  var cabecera = dbFindById_('MOVIMIENTOS', movimientoId);
   if (!cabecera) throw new Error('Movimiento no encontrado: ' + movimientoId);
-  var detalles = dbFindWhere('MOVIMIENTO_DETALLE', function (d) {
+  var detalles = dbFindWhere_('MOVIMIENTO_DETALLE', function (d) {
     return d.movimiento_id === cabecera.movimiento_id;
   });
   return { cabecera: cabecera, detalles: detalles };
@@ -260,14 +260,14 @@ function movObtenerDetalle(movimientoId) {
  * Trazabilidad de un producto: todos sus detalles de movimientos
  * confirmados en orden cronológico, con la cabecera de cada uno.
  */
-function movTrazabilidadProducto(productoId) {
+function movTrazabilidadProducto_(productoId) {
   var confirmados = {};
-  dbReadAll('MOVIMIENTOS').forEach(function (m) {
+  dbReadAll_('MOVIMIENTOS').forEach(function (m) {
     if (m.estado === CONFIG.ESTADOS_MOVIMIENTO.CONFIRMADO) {
       confirmados[m.movimiento_id] = m;
     }
   });
-  return dbFindWhere('MOVIMIENTO_DETALLE', function (d) {
+  return dbFindWhere_('MOVIMIENTO_DETALLE', function (d) {
     return d.producto_id === utilTrim(productoId) && confirmados[d.movimiento_id];
   }).map(function (d) {
     var m = confirmados[d.movimiento_id];

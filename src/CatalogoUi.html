@@ -178,6 +178,8 @@
   </section>
 </main>
 
+<?!= include('SesionParcial'); ?>
+
 <script>
 var catalogo = [];
 var csvPrevisualizado = null;
@@ -198,15 +200,13 @@ function aviso(mensaje, tipo) {
 }
 function llamar(fn, args, onOk) {
   document.body.classList.add('cargando');
-  google.script.run
-    .withSuccessHandler(function (r) {
-      document.body.classList.remove('cargando');
-      onOk(r);
-    })
-    .withFailureHandler(function (err) {
-      document.body.classList.remove('cargando');
-      aviso(err.message || String(err), 'err');
-    })[fn].apply(null, args || []);
+  Sesion.api(fn, args, function (r) {
+    document.body.classList.remove('cargando');
+    onOk(r);
+  }, function (err) {
+    document.body.classList.remove('cargando');
+    aviso((err && err.message) || String(err), 'err');
+  });
 }
 function descargar(nombre, contenido) {
   var blob = new Blob([contenido], { type: 'text/csv;charset=utf-8' });
@@ -227,7 +227,7 @@ function mostrarTab(nombre) {
 
 // ------------------------------- catálogo --------------------------------
 function cargarCatalogo() {
-  llamar('catalogoListar', [], function (r) {
+  llamar('apiCatalogoListar', [], function (r) {
     catalogo = r || [];
     renderCatalogo();
   });
@@ -341,8 +341,8 @@ function guardarEditor(ev) {
       categoria: document.getElementById('ed-categoria').value,
       descripcion: document.getElementById('ed-descripcion').value
     };
-    if (modo === 'crear-producto') llamar('catalogoCrearProducto', [datosP], listo);
-    else llamar('catalogoEditarProducto', [id, datosP], listo);
+    if (modo === 'crear-producto') llamar('apiCatalogoCrearProducto', [datosP], listo);
+    else llamar('apiCatalogoEditarProducto', [id, datosP], listo);
   } else {
     var datosF = {
       producto_id: modo === 'crear-formato' ? id : undefined,
@@ -351,13 +351,13 @@ function guardarEditor(ev) {
       tipo_empaque: document.getElementById('ed-tipo-empaque').value,
       unidades_por_empaque: document.getElementById('ed-unidades').value
     };
-    if (modo === 'crear-formato') llamar('catalogoCrearFormato', [datosF], listo);
-    else llamar('catalogoEditarFormato', [id, datosF], listo);
+    if (modo === 'crear-formato') llamar('apiCatalogoCrearFormato', [datosF], listo);
+    else llamar('apiCatalogoEditarFormato', [id, datosF], listo);
   }
   return false;
 }
 function cambiarEstado(entidad, id, activar, forzar) {
-  llamar('catalogoCambiarEstado', [entidad, id, activar, forzar], function (r) {
+  llamar('apiCatalogoCambiarEstado', [entidad, id, activar, forzar], function (r) {
     if (r && r.requiereConfirmacion) {
       if (confirm(r.advertencia + '\n\n¿Continuar?')) {
         cambiarEstado(entidad, id, activar, true);
@@ -371,12 +371,12 @@ function cambiarEstado(entidad, id, activar, forzar) {
 
 // ---------------------------- importar/exportar ---------------------------
 function descargarPlantilla() {
-  llamar('importacionPlantillaCsv', [], function (csv) {
+  llamar('apiImportPlantilla', [], function (csv) {
     descargar('plantilla_catalogo.csv', csv);
   });
 }
 function exportarCatalogo() {
-  llamar('catalogoExportarCsv', [], function (csv) {
+  llamar('apiCatalogoExportar', [], function (csv) {
     descargar('catalogo_exportado.csv', csv);
   });
 }
@@ -394,7 +394,7 @@ function previsualizar() {
   var csv = document.getElementById('texto-csv').value;
   if (!csv.trim()) { aviso('No hay contenido CSV para previsualizar.', 'err'); return; }
   var modo = document.getElementById('modo-import').value;
-  llamar('importacionPrevisualizar', [csv, modo], function (r) {
+  llamar('apiImportPrevisualizar', [csv, modo], function (r) {
     csvPrevisualizado = null;
     var cont = document.getElementById('resultado-preview');
     if (!r.ok) {
@@ -444,7 +444,7 @@ function confirmarImportacion() {
   var input = document.getElementById('archivo-csv');
   var nombre = (input.files && input.files[0] && input.files[0].name) || 'pegado manual';
   document.getElementById('btn-confirmar').disabled = true;
-  llamar('importacionAplicar', [csvPrevisualizado, modo, nombre], function (r) {
+  llamar('apiImportAplicar', [csvPrevisualizado, modo, nombre], function (r) {
     var d = r.detalle;
     aviso('IMPORTACIÓN COMPLETADA (' + r.importacion_id + ')\n' +
       'Productos creados: ' + d.productosCreados +
@@ -463,7 +463,7 @@ function confirmarImportacion() {
 
 // ------------------------------- historial --------------------------------
 function cargarHistorial() {
-  llamar('histListar', [100], function (rows) {
+  llamar('apiHistorialListar', [100], function (rows) {
     var html = '<table><tr><th>Fecha</th><th>Usuario</th><th>Entidad</th>' +
       '<th>Campo</th><th>Cambio</th><th>Origen</th></tr>';
     (rows || []).forEach(function (h) {
@@ -477,7 +477,7 @@ function cargarHistorial() {
     document.getElementById('lista-historial').innerHTML =
       rows && rows.length ? html : '<p class="muted">Sin cambios registrados.</p>';
   });
-  llamar('importacionListar', [20], function (rows) {
+  llamar('apiImportListar', [20], function (rows) {
     var html = '<table><tr><th>ID</th><th>Fecha</th><th>Archivo</th><th>Filas</th>' +
       '<th>Creados</th><th>Actualizados</th><th>Sin cambios</th><th>Errores</th></tr>';
     (rows || []).forEach(function (i) {
@@ -493,10 +493,14 @@ function cargarHistorial() {
 }
 
 // -------------------------------- arranque --------------------------------
-cargarCatalogo();
-llamar('importacionInstrucciones', [], function (lista) {
-  document.getElementById('instrucciones').innerHTML =
-    (lista || []).map(function (i) { return '<li>' + esc(i) + '</li>'; }).join('');
+// Solo jefatura puede administrar el catálogo (§12.4); el servidor lo
+// revalida en cada llamada.
+Sesion.asegurar('JEFATURA', function () {
+  cargarCatalogo();
+  llamar('apiImportInstrucciones', [], function (lista) {
+    document.getElementById('instrucciones').innerHTML =
+      (lista || []).map(function (i) { return '<li>' + esc(i) + '</li>'; }).join('');
+  });
 });
 </script>
 </body>

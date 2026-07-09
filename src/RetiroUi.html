@@ -97,8 +97,8 @@
   <section id="vista-inicio" class="vista activa">
     <button class="btn-grande principal" onclick="iniciarRetiro()">📷 REGISTRAR RETIRO</button>
     <div class="tarjeta">
-      <h2>Mis retiros recientes (este teléfono)</h2>
-      <div id="mis-retiros"><p class="muted">Sin retiros registrados desde este dispositivo.</p></div>
+      <h2>Mis retiros recientes</h2>
+      <div id="mis-retiros"><p class="muted">Cargando…</p></div>
     </div>
   </section>
 
@@ -150,6 +150,8 @@
   </section>
 </main>
 
+<?!= include('SesionParcial'); ?>
+
 <script>
 // Borrador local (§23): el retiro en preparación no toca el stock y
 // sobrevive si se cierra el navegador. Se limpia al confirmar o cancelar.
@@ -160,7 +162,6 @@ var lectorZXing = null;
 var escaneando = false;
 var ultimoScan = { codigo: '', t: 0 };
 var CLAVE_BORRADOR = 'retiro_borrador_v1';
-var CLAVE_HISTORIAL = 'mis_retiros_v1';
 
 function esc(s) {
   return String(s === null || s === undefined ? '' : s)
@@ -333,22 +334,19 @@ function procesarCodigo(codigo) {
   if (cacheCodigos[codigo]) { agregarAlCarro(cacheCodigos[codigo]); return; }
 
   mensaje('Buscando código…');
-  google.script.run
-    .withSuccessHandler(function (r) {
-      if (!r.encontrado) {
-        // §22 trabajador: no puede crear productos; solo volver a escanear.
-        mensaje('✖ Producto no registrado (' + r.codigo_barras +
-          '). Avisa a jefatura. Puedes escanear otro código.', 'err');
-        vibrar([80, 60, 80]);
-        return;
-      }
-      cacheCodigos[codigo] = r;
-      agregarAlCarro(r);
-    })
-    .withFailureHandler(function (err) {
-      mensaje('✖ Error de conexión: ' + (err.message || err), 'err');
-    })
-    .movBuscarCodigo(codigo);
+  Sesion.api('apiBuscarCodigo', [codigo], function (r) {
+    if (!r.encontrado) {
+      // §22 trabajador: no puede crear productos; solo volver a escanear.
+      mensaje('✖ Producto no registrado (' + r.codigo_barras +
+        '). Avisa a jefatura. Puedes escanear otro código.', 'err');
+      vibrar([80, 60, 80]);
+      return;
+    }
+    cacheCodigos[codigo] = r;
+    agregarAlCarro(r);
+  }, function (err) {
+    mensaje('✖ Error de conexión: ' + ((err && err.message) || err), 'err');
+  });
 }
 function agregarAlCarro(info) {
   carro.push({
@@ -448,76 +446,60 @@ function confirmarRetiro() {
   boton.textContent = 'Procesando…';
   mensaje('Confirmando retiro…');
 
-  google.script.run
-    .withSuccessHandler(function (r) {
-      limpiarBorrador();
-      carro = [];
-      guardarHistorialLocal(r);
-      var lineas = r.detalles.map(function (d) {
-        return '• ' + d.producto + ' — ' + d.formato + ': ' + d.cantidad_empaques +
-          ' empaques = ' + (-d.unidades) + ' unidades';
-      });
-      document.getElementById('resultado-texto').textContent =
-        'RETIRO ' + r.movimiento_id + ' — ' + r.fecha_hora + '\n' +
-        lineas.join('\n') + '\nTotal retirado: ' + r.total_unidades + ' unidades.';
-      boton.disabled = false;
-      boton.textContent = 'CONFIRMAR RETIRO';
-      mensaje('');
-      vibrar([100, 80, 100]);
-      mostrarVista('resultado');
+  Sesion.api('apiRetiroConfirmar', [{
+    items: carro.map(function (i) {
+      return { codigo_barras: i.codigo_barras, cantidad_empaques: i.cantidad };
     })
-    .withFailureHandler(function (err) {
-      boton.disabled = false;
-      boton.textContent = 'CONFIRMAR RETIRO';
-      // §15: nada cambió; el carro queda para corregir.
-      mensaje('✖ No se confirmó el retiro: ' + (err.message || err) +
-        '\nEl carro se mantiene para que lo corrijas.', 'err');
-      vibrar([200]);
-    })
-    .movConfirmar({
-      tipo: 'RETIRO',
-      origen: 'BODEGA',
-      destino: 'TIENDA',
-      items: carro.map(function (i) {
-        return { codigo_barras: i.codigo_barras, cantidad_empaques: i.cantidad };
-      })
+  }], function (r) {
+    limpiarBorrador();
+    carro = [];
+    var lineas = r.detalles.map(function (d) {
+      return '• ' + d.producto + ' — ' + d.formato + ': ' + d.cantidad_empaques +
+        ' empaques = ' + (-d.unidades) + ' unidades';
     });
+    document.getElementById('resultado-texto').textContent =
+      'RETIRO ' + r.movimiento_id + ' — ' + r.fecha_hora + '\n' +
+      lineas.join('\n') + '\nTotal retirado: ' + r.total_unidades + ' unidades.';
+    boton.disabled = false;
+    boton.textContent = 'CONFIRMAR RETIRO';
+    mensaje('');
+    vibrar([100, 80, 100]);
+    mostrarVista('resultado');
+  }, function (err) {
+    boton.disabled = false;
+    boton.textContent = 'CONFIRMAR RETIRO';
+    // §15: nada cambió; el carro queda para corregir.
+    mensaje('✖ No se confirmó el retiro: ' + ((err && err.message) || err) +
+      '\nEl carro se mantiene para que lo corrijas.', 'err');
+    vibrar([200]);
+  });
 }
 
-// --------------------- "mis retiros" locales (hasta Fase 7) ----------------
-function guardarHistorialLocal(r) {
-  try {
-    var lista = JSON.parse(localStorage.getItem(CLAVE_HISTORIAL) || '[]');
-    lista.unshift({
-      movimiento_id: r.movimiento_id, fecha_hora: r.fecha_hora,
-      total_unidades: r.total_unidades, total_empaques: r.total_empaques,
-      resumen: r.detalles.map(function (d) {
-        return d.producto + ' ×' + d.cantidad_empaques;
-      }).join(', ')
-    });
-    localStorage.setItem(CLAVE_HISTORIAL, JSON.stringify(lista.slice(0, 20)));
-  } catch (e) { /* sin almacenamiento */ }
-}
+// ------------------ "mis retiros" del usuario autenticado ------------------
 function renderMisRetiros() {
   var cont = document.getElementById('mis-retiros');
-  try {
-    var lista = JSON.parse(localStorage.getItem(CLAVE_HISTORIAL) || '[]');
-    if (!lista.length) {
-      cont.innerHTML = '<p class="muted">Sin retiros registrados desde este dispositivo.</p>';
+  Sesion.api('apiMisMovimientos', [], function (lista) {
+    if (!lista || !lista.length) {
+      cont.innerHTML = '<p class="muted">Aún no registras retiros.</p>';
       return;
     }
-    cont.innerHTML = lista.map(function (h) {
-      return '<div class="hist"><strong>' + esc(h.movimiento_id) + '</strong> · ' +
-        esc(h.fecha_hora) + '<br>' + esc(h.resumen) + ' — ' +
-        h.total_unidades + ' unidades</div>';
+    cont.innerHTML = lista.map(function (m) {
+      return '<div class="hist"><strong>' + esc(m.movimiento_id) + '</strong> · ' +
+        esc(m.fecha_hora) + '<br>' + esc(m.tipo) + ' — ' +
+        esc(m.total_empaques) + ' empaques = ' + esc(m.total_unidades) +
+        ' unidades → ' + esc(m.destino) + '</div>';
     }).join('');
-  } catch (e) {
+  }, function () {
     cont.innerHTML = '<p class="muted">Historial no disponible.</p>';
-  }
+  });
 }
 
-renderMisRetiros();
-restaurarBorrador();
+// Retiro: disponible para TRABAJADOR y JEFATURA; el servidor valida la
+// sesión en cada operación y registra al usuario autenticado como responsable.
+Sesion.asegurar(null, function () {
+  renderMisRetiros();
+  restaurarBorrador();
+});
 </script>
 </body>
 </html>

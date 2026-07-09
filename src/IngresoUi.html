@@ -104,6 +104,8 @@
   </div>
 </main>
 
+<?!= include('SesionParcial'); ?>
+
 <script>
 // Carro en preparación (borrador, §23): vive en el navegador y en
 // localStorage. No toca el stock hasta confirmar.
@@ -170,22 +172,19 @@ function agregarEscaneo(codigo) {
   if (procesando) { estado('Procesando escaneo anterior…', 'muted'); return; }
   procesando = true;
   estado('Buscando código ' + codigo + '…', 'muted');
-  google.script.run
-    .withSuccessHandler(function (r) {
-      procesando = false;
-      if (!r.encontrado) {
-        estado('✖ Código no registrado: ' + r.codigo_barras +
-          '. Créalo primero en el catálogo.', 'err');
-        return;
-      }
-      cacheCodigos[codigo] = r;
-      agregarAlCarro(r);
-    })
-    .withFailureHandler(function (err) {
-      procesando = false;
-      estado('✖ Error: ' + (err.message || err), 'err');
-    })
-    .movBuscarCodigo(codigo);
+  Sesion.api('apiBuscarCodigo', [codigo], function (r) {
+    procesando = false;
+    if (!r.encontrado) {
+      estado('✖ Código no registrado: ' + r.codigo_barras +
+        '. Créalo primero en el catálogo.', 'err');
+      return;
+    }
+    cacheCodigos[codigo] = r;
+    agregarAlCarro(r);
+  }, function (err) {
+    procesando = false;
+    estado('✖ Error: ' + ((err && err.message) || err), 'err');
+  });
 }
 function agregarAlCarro(info) {
   carro.push({
@@ -281,39 +280,33 @@ function confirmarIngreso() {
   boton.textContent = 'Procesando…';
   estado('Confirmando ingreso…', 'muted');
 
-  google.script.run
-    .withSuccessHandler(function (r) {
-      limpiarBorrador();
-      carro = [];
-      var lineas = r.detalles.map(function (d) {
-        return '  • ' + d.producto + ' — ' + d.formato + ': ' + d.cantidad_empaques +
-          ' empaques = +' + d.unidades + ' unidades (stock: ' + d.stock_posterior + ')';
-      });
-      document.getElementById('resultado-texto').textContent =
-        'INGRESO CONFIRMADO — ' + r.movimiento_id + '\n' +
-        r.fecha_hora + '\n' + lineas.join('\n') +
-        '\nTotal: +' + r.total_unidades + ' unidades.';
-      document.getElementById('resultado').style.display = '';
-      renderCarro();
-      document.getElementById('observacion').value = '';
-      boton.textContent = 'CONFIRMAR INGRESO';
-      estado('Ingreso registrado. Puedes iniciar uno nuevo.', 'ok');
+  Sesion.api('apiIngresoConfirmar', [{
+    observacion: document.getElementById('observacion').value,
+    items: carro.map(function (i) {
+      return { codigo_barras: i.codigo_barras, cantidad_empaques: i.cantidad };
     })
-    .withFailureHandler(function (err) {
-      boton.disabled = false;
-      boton.textContent = 'CONFIRMAR INGRESO';
-      estado('✖ No se confirmó: ' + (err.message || err) +
-        ' El ingreso quedó en preparación para corregirlo.', 'err');
-    })
-    .movConfirmar({
-      tipo: 'ENTRADA',
-      origen: 'PROVEEDOR',
-      destino: 'BODEGA',
-      observacion: document.getElementById('observacion').value,
-      items: carro.map(function (i) {
-        return { codigo_barras: i.codigo_barras, cantidad_empaques: i.cantidad };
-      })
+  }], function (r) {
+    limpiarBorrador();
+    carro = [];
+    var lineas = r.detalles.map(function (d) {
+      return '  • ' + d.producto + ' — ' + d.formato + ': ' + d.cantidad_empaques +
+        ' empaques = +' + d.unidades + ' unidades (stock: ' + d.stock_posterior + ')';
     });
+    document.getElementById('resultado-texto').textContent =
+      'INGRESO CONFIRMADO — ' + r.movimiento_id + '\n' +
+      r.fecha_hora + '\n' + lineas.join('\n') +
+      '\nTotal: +' + r.total_unidades + ' unidades.';
+    document.getElementById('resultado').style.display = '';
+    renderCarro();
+    document.getElementById('observacion').value = '';
+    boton.textContent = 'CONFIRMAR INGRESO';
+    estado('Ingreso registrado. Puedes iniciar uno nuevo.', 'ok');
+  }, function (err) {
+    boton.disabled = false;
+    boton.textContent = 'CONFIRMAR INGRESO';
+    estado('✖ No se confirmó: ' + ((err && err.message) || err) +
+      ' El ingreso quedó en preparación para corregirlo.', 'err');
+  });
 }
 function cancelarIngreso() {
   if (carro.length && !confirm('¿Vaciar el ingreso en preparación? No se registró nada.')) return;
@@ -330,9 +323,12 @@ function nuevoIngreso() {
 }
 
 document.getElementById('observacion').addEventListener('change', guardarBorrador);
-restaurarBorrador();
-renderCarro();
-reenfocar();
+// El ingreso es exclusivo de jefatura (§12.4); el servidor lo revalida.
+Sesion.asegurar('JEFATURA', function () {
+  restaurarBorrador();
+  renderCarro();
+  reenfocar();
+});
 </script>
 </body>
 </html>

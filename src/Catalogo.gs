@@ -15,10 +15,10 @@
  */
 
 /** Catálogo completo: productos con sus formatos anidados. */
-function catalogoListar() {
-  var productos = dbReadAll('PRODUCTOS');
-  var formatos = dbReadAll('FORMATOS_EMPAQUE');
-  var inventario = dbReadAll('INVENTARIO');
+function catalogoListar_() {
+  var productos = dbReadAll_('PRODUCTOS');
+  var formatos = dbReadAll_('FORMATOS_EMPAQUE');
+  var inventario = dbReadAll_('INVENTARIO');
 
   var stockPorProducto = {};
   inventario.forEach(function (i) {
@@ -47,7 +47,7 @@ function catalogoListar() {
 }
 
 /** Crea un producto. Devuelve el producto creado. */
-function catalogoCrearProducto(datos, origen, usuarioId) {
+function catalogoCrearProducto_(datos, origen, usuarioId) {
   origen = origen || CONFIG.ORIGENES_CAMBIO.EDICION_MANUAL;
   usuarioId = usuarioId || CONFIG.USUARIO_PENDIENTE_AUTH;
 
@@ -55,7 +55,7 @@ function catalogoCrearProducto(datos, origen, usuarioId) {
   var codigoProducto = utilTrim(datos.codigo_producto);
 
   if (codigoProducto) {
-    var existente = dbFindOne('PRODUCTOS', function (p) {
+    var existente = dbFindOne_('PRODUCTOS', function (p) {
       return p.codigo_producto === codigoProducto;
     });
     if (existente) {
@@ -67,7 +67,7 @@ function catalogoCrearProducto(datos, origen, usuarioId) {
 
   var ahora = utilNow();
   var producto = {
-    producto_id: idNext('PRODUCTO'),
+    producto_id: idNext_('PRODUCTO'),
     codigo_producto: codigoProducto,
     nombre: nombre,
     categoria: utilTrim(datos.categoria),
@@ -76,18 +76,18 @@ function catalogoCrearProducto(datos, origen, usuarioId) {
     created_at: ahora,
     updated_at: ahora
   };
-  dbAppendRow('PRODUCTOS', producto);
-  histRegistrar(usuarioId, 'PRODUCTO', producto.producto_id, 'creacion', '',
+  dbAppendRow_('PRODUCTOS', producto);
+  histRegistrar_(usuarioId, 'PRODUCTO', producto.producto_id, 'creacion', '',
     producto.nombre, origen);
   return producto;
 }
 
 /** Edita campos de un producto existente. El stock nunca se toca (§8.9). */
-function catalogoEditarProducto(productoId, patch, origen, usuarioId) {
+function catalogoEditarProducto_(productoId, patch, origen, usuarioId) {
   origen = origen || CONFIG.ORIGENES_CAMBIO.EDICION_MANUAL;
   usuarioId = usuarioId || CONFIG.USUARIO_PENDIENTE_AUTH;
 
-  var producto = dbFindById('PRODUCTOS', productoId);
+  var producto = dbFindById_('PRODUCTOS', productoId);
   if (!producto) throw new Error('Producto no encontrado: ' + productoId);
 
   var cambios = {};
@@ -102,7 +102,7 @@ function catalogoEditarProducto(productoId, patch, origen, usuarioId) {
     valRequireNonEmpty(cambios.nombre, 'nombre del producto');
   }
   if (cambios.codigo_producto) {
-    var duplicado = dbFindOne('PRODUCTOS', function (p) {
+    var duplicado = dbFindOne_('PRODUCTOS', function (p) {
       return p.codigo_producto === cambios.codigo_producto &&
              p.producto_id !== producto.producto_id;
     });
@@ -113,19 +113,19 @@ function catalogoEditarProducto(productoId, patch, origen, usuarioId) {
     }
   }
 
-  histRegistrarCambios(usuarioId, 'PRODUCTO', producto.producto_id, producto,
+  histRegistrarCambios_(usuarioId, 'PRODUCTO', producto.producto_id, producto,
     cambios, origen);
   cambios.updated_at = utilNow();
-  dbUpdateById('PRODUCTOS', productoId, cambios);
-  return dbFindById('PRODUCTOS', productoId);
+  dbUpdateById_('PRODUCTOS', productoId, cambios);
+  return dbFindById_('PRODUCTOS', productoId);
 }
 
 /** Crea un formato de empaque para un producto existente. */
-function catalogoCrearFormato(datos, origen, usuarioId) {
+function catalogoCrearFormato_(datos, origen, usuarioId) {
   origen = origen || CONFIG.ORIGENES_CAMBIO.EDICION_MANUAL;
   usuarioId = usuarioId || CONFIG.USUARIO_PENDIENTE_AUTH;
 
-  var producto = dbFindById('PRODUCTOS', utilTrim(datos.producto_id));
+  var producto = dbFindById_('PRODUCTOS', utilTrim(datos.producto_id));
   if (!producto) throw new Error('Producto no encontrado: ' + datos.producto_id);
 
   var codigoBarras = utilNormalizeBarcode(datos.codigo_barras);
@@ -143,7 +143,7 @@ function catalogoCrearFormato(datos, origen, usuarioId) {
 
   var ahora = utilNow();
   var formato = {
-    formato_id: idNext('FORMATO'),
+    formato_id: idNext_('FORMATO'),
     producto_id: producto.producto_id,
     codigo_barras: codigoBarras,
     nombre_formato: valRequireNonEmpty(datos.nombre_formato, 'nombre del formato'),
@@ -153,8 +153,8 @@ function catalogoCrearFormato(datos, origen, usuarioId) {
     created_at: ahora,
     updated_at: ahora
   };
-  dbAppendRow('FORMATOS_EMPAQUE', formato);
-  histRegistrar(usuarioId, 'FORMATO', formato.formato_id, 'creacion', '',
+  dbAppendRow_('FORMATOS_EMPAQUE', formato);
+  histRegistrar_(usuarioId, 'FORMATO', formato.formato_id, 'creacion', '',
     producto.nombre + ' / ' + formato.nombre_formato + ' (' + codigoBarras + ')',
     origen);
   return formato;
@@ -165,11 +165,11 @@ function catalogoCrearFormato(datos, origen, usuarioId) {
  * futuros: los históricos conservan su snapshot y el stock no se recalcula
  * (§8.8, §8.9, Caso 10).
  */
-function catalogoEditarFormato(formatoId, patch, origen, usuarioId) {
+function catalogoEditarFormato_(formatoId, patch, origen, usuarioId) {
   origen = origen || CONFIG.ORIGENES_CAMBIO.EDICION_MANUAL;
   usuarioId = usuarioId || CONFIG.USUARIO_PENDIENTE_AUTH;
 
-  var formato = dbFindById('FORMATOS_EMPAQUE', formatoId);
+  var formato = dbFindById_('FORMATOS_EMPAQUE', formatoId);
   if (!formato) throw new Error('Formato no encontrado: ' + formatoId);
 
   var cambios = {};
@@ -201,10 +201,10 @@ function catalogoEditarFormato(formatoId, patch, origen, usuarioId) {
       valRequirePositiveInt(cambios.unidades_por_empaque, 'unidades por empaque');
   }
 
-  histRegistrarCambios(usuarioId, 'FORMATO', formatoId, formato, cambios, origen);
+  histRegistrarCambios_(usuarioId, 'FORMATO', formatoId, formato, cambios, origen);
   cambios.updated_at = utilNow();
-  dbUpdateById('FORMATOS_EMPAQUE', formatoId, cambios);
-  return dbFindById('FORMATOS_EMPAQUE', formatoId);
+  dbUpdateById_('FORMATOS_EMPAQUE', formatoId, cambios);
+  return dbFindById_('FORMATOS_EMPAQUE', formatoId);
 }
 
 /**
@@ -215,12 +215,12 @@ function catalogoEditarFormato(formatoId, patch, origen, usuarioId) {
  * para que la interfaz pida confirmación explícita (§8.10). Nunca se elimina
  * físicamente nada.
  */
-function catalogoCambiarEstado(entidad, id, activar, forzar, origen, usuarioId) {
+function catalogoCambiarEstado_(entidad, id, activar, forzar, origen, usuarioId) {
   origen = origen || CONFIG.ORIGENES_CAMBIO.EDICION_MANUAL;
   usuarioId = usuarioId || CONFIG.USUARIO_PENDIENTE_AUTH;
 
   var sheetKey = entidad === 'PRODUCTO' ? 'PRODUCTOS' : 'FORMATOS_EMPAQUE';
-  var registro = dbFindById(sheetKey, id);
+  var registro = dbFindById_(sheetKey, id);
   if (!registro) throw new Error(entidad + ' no encontrado: ' + id);
 
   var nuevoEstado = utilBoolToSheet(!!activar);
@@ -239,8 +239,8 @@ function catalogoCambiarEstado(entidad, id, activar, forzar, origen, usuarioId) 
     catalogoValidarCodigoBarrasUnico_(registro.codigo_barras, id);
   }
 
-  histRegistrar(usuarioId, entidad, id, 'activo', registro.activo, nuevoEstado, origen);
-  dbUpdateById(sheetKey, id, { activo: nuevoEstado, updated_at: utilNow() });
+  histRegistrar_(usuarioId, entidad, id, 'activo', registro.activo, nuevoEstado, origen);
+  dbUpdateById_(sheetKey, id, { activo: nuevoEstado, updated_at: utilNow() });
   return { aplicado: true };
 }
 
@@ -249,11 +249,11 @@ function catalogoAdvertenciaDesactivacion_(entidad, registro) {
   var productoId = entidad === 'PRODUCTO' ? registro.producto_id : registro.producto_id;
   var partes = [];
 
-  var inv = dbFindById('INVENTARIO', productoId);
+  var inv = dbFindById_('INVENTARIO', productoId);
   var stock = inv ? (utilToInt(inv.stock_unidades) || 0) : 0;
   if (stock > 0) partes.push(stock + ' unidades en stock');
 
-  var tieneMovimientos = dbFindOne('MOVIMIENTO_DETALLE', function (d) {
+  var tieneMovimientos = dbFindOne_('MOVIMIENTO_DETALLE', function (d) {
     return entidad === 'PRODUCTO'
       ? d.producto_id === registro.producto_id
       : d.formato_id === registro.formato_id;
@@ -267,13 +267,13 @@ function catalogoAdvertenciaDesactivacion_(entidad, registro) {
 
 /** Lanza error si otro formato ACTIVO ya usa el código de barras (§8.5). */
 function catalogoValidarCodigoBarrasUnico_(codigoBarras, formatoIdExcluido) {
-  var conflicto = dbFindOne('FORMATOS_EMPAQUE', function (f) {
+  var conflicto = dbFindOne_('FORMATOS_EMPAQUE', function (f) {
     return f.codigo_barras === codigoBarras &&
            utilToBool(f.activo) &&
            f.formato_id !== formatoIdExcluido;
   });
   if (conflicto) {
-    var producto = dbFindById('PRODUCTOS', conflicto.producto_id);
+    var producto = dbFindById_('PRODUCTOS', conflicto.producto_id);
     throw new Error(
       'El código de barras "' + codigoBarras + '" ya está en uso por el ' +
       'formato activo "' + conflicto.nombre_formato + '" del producto "' +
@@ -285,21 +285,21 @@ function catalogoValidarCodigoBarrasUnico_(codigoBarras, formatoIdExcluido) {
  * Busca un formato ACTIVO por código de barras, con su producto. Base del
  * escaneo en ingresos y retiros (Fases 4 y 5). Devuelve null si no existe.
  */
-function catalogoBuscarPorCodigoBarras(codigoBarras) {
+function catalogoBuscarPorCodigoBarras_(codigoBarras) {
   var codigo = utilNormalizeBarcode(codigoBarras);
-  var formato = dbFindOne('FORMATOS_EMPAQUE', function (f) {
+  var formato = dbFindOne_('FORMATOS_EMPAQUE', function (f) {
     return f.codigo_barras === codigo && utilToBool(f.activo);
   });
   if (!formato) return null;
-  var producto = dbFindById('PRODUCTOS', formato.producto_id);
+  var producto = dbFindById_('PRODUCTOS', formato.producto_id);
   if (!producto || !utilToBool(producto.activo)) return null;
   return { producto: producto, formato: formato };
 }
 
 /** Exporta el catálogo completo como CSV (§8.13), reimportable tras editar. */
-function catalogoExportarCsv() {
+function catalogoExportarCsv_() {
   var productos = {};
-  dbReadAll('PRODUCTOS').forEach(function (p) { productos[p.producto_id] = p; });
+  dbReadAll_('PRODUCTOS').forEach(function (p) { productos[p.producto_id] = p; });
 
   var filas = [[
     'producto_id', 'codigo_producto', 'nombre_producto', 'categoria',
@@ -307,7 +307,7 @@ function catalogoExportarCsv() {
     'tipo_empaque', 'unidades_por_empaque', 'activo'
   ]];
 
-  dbReadAll('FORMATOS_EMPAQUE').forEach(function (f) {
+  dbReadAll_('FORMATOS_EMPAQUE').forEach(function (f) {
     var p = productos[f.producto_id] || {};
     filas.push([
       f.producto_id, p.codigo_producto || '', p.nombre || '', p.categoria || '',

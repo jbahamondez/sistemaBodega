@@ -160,3 +160,22 @@ ese teléfono en localStorage (máx. 20) y los muestra como "Mis retiros
 recientes (este teléfono)" — el texto es honesto sobre el alcance. En la
 Fase 7 se reemplaza por el filtro por usuario autenticado (movListar ya lo
 soporta).
+
+## D-020 — Autorización real: sufijo `_` + capa Api.gs con token
+
+`google.script.run` puede invocar CUALQUIER función global del proyecto, así
+que ocultar botones no protege nada (§24). Apps Script no permite invocar
+desde el cliente funciones cuyo nombre termina en `_`: por eso TODA la
+lógica de negocio y el acceso a datos usan ese sufijo, y la única superficie
+pública es `Api.gs`, donde cada función valida el token de sesión y el rol
+en el servidor antes de operar. Las sesiones viven en CacheService (6 h,
+su TTL máximo); expirada la caché, el usuario vuelve a ingresar su PIN. El
+responsable de cada movimiento es SIEMPRE el usuario de la sesión validada,
+nunca un dato enviado por el cliente.
+
+## D-021 — Reglas defensivas en administración de usuarios
+
+Jefatura no puede desactivar su propia cuenta ni cambiar su propio rol (se
+evita dejar el sistema sin administradores por accidente). Los usuarios se
+desactivan, nunca se eliminan, y el login responde "Usuario o PIN
+incorrecto" sin revelar si el identificador existe.

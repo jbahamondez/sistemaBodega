@@ -79,6 +79,7 @@ class MockSpreadsheet {
 
 const spreadsheets = new Map();
 const scriptProperties = {};
+const cacheStore = {};
 
 // ------------------- Mocks de servicios de Apps Script ---------------------
 const context = {
@@ -102,6 +103,13 @@ const context = {
   },
   LockService: {
     getScriptLock: () => ({ tryLock: () => true, releaseLock: () => {} })
+  },
+  CacheService: {
+    getScriptCache: () => ({
+      put: (k, v) => { cacheStore[k] = String(v); },
+      get: (k) => (k in cacheStore ? cacheStore[k] : null),
+      remove: (k) => { delete cacheStore[k]; }
+    })
   },
   Utilities: {
     DigestAlgorithm: { SHA_256: 'SHA_256' },
@@ -133,7 +141,7 @@ try {
 
   // 2. Base simulada + pruebas de movimientos (Casos 1, 2, 3 y 5).
   vm.runInContext(
-    "setupDatabase(); dbSetConfigValue('entorno', 'TEST');", context);
+    "setupDatabase(); dbSetConfigValue_('entorno', 'TEST');", context);
   const reporte2 = vm.runInContext('runMovimientoTests()', context);
 
   console.log('\nPRUEBAS LOCALES OK');

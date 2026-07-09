@@ -10,9 +10,9 @@
  * Registra un cambio de un campo de una entidad del catálogo.
  * entidad: 'PRODUCTO' | 'FORMATO'.
  */
-function histRegistrar(usuarioId, entidad, entidadId, campo, valorAnterior, valorNuevo, origen) {
-  dbAppendRow('HISTORIAL_CATALOGO', {
-    historial_id: idNext('HISTORIAL'),
+function histRegistrar_(usuarioId, entidad, entidadId, campo, valorAnterior, valorNuevo, origen) {
+  dbAppendRow_('HISTORIAL_CATALOGO', {
+    historial_id: idNext_('HISTORIAL'),
     fecha_hora: utilNow(),
     usuario_id: usuarioId,
     entidad: entidad,
@@ -28,13 +28,13 @@ function histRegistrar(usuarioId, entidad, entidadId, campo, valorAnterior, valo
  * Registra en lote los cambios detectados entre un registro existente y un
  * patch (solo campos cuyo valor cambia). Devuelve la cantidad registrada.
  */
-function histRegistrarCambios(usuarioId, entidad, entidadId, registroAnterior, patch, origen) {
+function histRegistrarCambios_(usuarioId, entidad, entidadId, registroAnterior, patch, origen) {
   var cambios = Object.keys(patch).filter(function (campo) {
     return utilTrim(registroAnterior[campo]) !== utilTrim(patch[campo]);
   });
   if (cambios.length === 0) return 0;
 
-  var ids = idNextBatch('HISTORIAL', cambios.length);
+  var ids = idNextBatch_('HISTORIAL', cambios.length);
   var ahora = utilNow();
   var filas = cambios.map(function (campo, i) {
     return {
@@ -49,13 +49,13 @@ function histRegistrarCambios(usuarioId, entidad, entidadId, registroAnterior, p
       origen: origen
     };
   });
-  dbAppendRows('HISTORIAL_CATALOGO', filas);
+  dbAppendRows_('HISTORIAL_CATALOGO', filas);
   return filas.length;
 }
 
 /** Últimos cambios del catálogo, más recientes primero. */
-function histListar(limite) {
-  var rows = dbReadAll('HISTORIAL_CATALOGO');
+function histListar_(limite) {
+  var rows = dbReadAll_('HISTORIAL_CATALOGO');
   rows.reverse();
   return rows.slice(0, limite || 100);
 }

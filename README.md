@@ -52,9 +52,20 @@ src/
   Panel.gs          Agregados del dashboard (totales, alertas de stock)
   PanelUi.html      Panel de jefatura (dashboard, inventario, movimientos, trazabilidad)
   CatalogoUi.html   Interfaz de administración del catálogo (jefatura, PC)
-  Code.gs           Punto de entrada web (doGet + routing)
+  Auth.gs           Login por identificador + PIN y sesiones por token
+  Usuarios.gs       Administración de usuarios (crear, estados, rol, reset PIN)
+  Api.gs            ÚNICA capa invocable desde el cliente; valida rol por operación
+  SesionParcial.html Login compartido insertado en todas las páginas
+  Code.gs           Punto de entrada web (doGet + routing con plantillas)
   SelfTest.gs       Pruebas (ejecutables en el editor y localmente con npm test)
 ```
+
+**Seguridad (Fase 7):** la lógica de negocio usa funciones con sufijo `_`,
+que Apps Script no permite invocar desde el cliente. `Api.gs` es la única
+superficie pública: cada función valida el token de sesión y el rol en el
+servidor. El responsable de cada movimiento es siempre el usuario
+autenticado. Trabajadores solo pueden buscar códigos, registrar retiros y
+ver sus propios movimientos; todo lo demás exige rol JEFATURA (§12.4).
 
 ## Modelo de datos (hojas)
 
@@ -204,7 +215,7 @@ símbolos usados entre archivos.
 | 4 | Ingreso de jefatura (pistola HID) | ✅ Completada |
 | 5 | Retiro móvil (cámara Android) | ✅ Completada |
 | 6 | Panel de jefatura: dashboard, inventario, movimientos, trazabilidad | ✅ Completada |
-| 7 | Usuarios y permisos (validación en servidor) | Pendiente |
+| 7 | Usuarios y permisos (validación en servidor) | ✅ Completada |
 | 8 | Calidad: casos de prueba obligatorios | Pendiente |
 
 ## Documentación adicional
