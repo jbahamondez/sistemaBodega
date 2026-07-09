@@ -159,6 +159,29 @@ function movConfirmar(datos) {
   }
 }
 
+/**
+ * Búsqueda por código de barras para las pantallas de escaneo (pistola en
+ * ingreso, cámara en retiro). Devuelve el producto, el formato y el stock
+ * actual, o { encontrado: false } si el código no está registrado (§22).
+ */
+function movBuscarCodigo(codigoBarras) {
+  var resultado = catalogoBuscarPorCodigoBarras(codigoBarras);
+  if (!resultado) {
+    return { encontrado: false, codigo_barras: utilNormalizeBarcode(codigoBarras) };
+  }
+  return {
+    encontrado: true,
+    codigo_barras: resultado.formato.codigo_barras,
+    producto_id: resultado.producto.producto_id,
+    producto_nombre: resultado.producto.nombre,
+    formato_id: resultado.formato.formato_id,
+    formato_nombre: resultado.formato.nombre_formato,
+    tipo_empaque: resultado.formato.tipo_empaque,
+    unidades_por_empaque: utilToInt(resultado.formato.unidades_por_empaque),
+    stock_unidades: invGetStock(resultado.producto.producto_id)
+  };
+}
+
 /** Resuelve un ítem contra el catálogo vigente y calcula su delta en unidades. */
 function movResolverItem_(item, tipo, posicion) {
   var cantidad = utilToInt(item.cantidad_empaques);

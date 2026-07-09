@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ingreso de mercadería — Sistema Bodega</title>
+<style>
+  :root {
+    --marron: #4e342e; --marron-claro: #6d4c41; --crema: #faf6f1;
+    --ok: #2e7d32; --err: #c62828; --borde: #e0d7ce; --gris: #757575;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; margin: 0; background: var(--crema); color: #2b2b2b; }
+  header { background: var(--marron); color: #fff; padding: .8rem 1.2rem;
+    display: flex; justify-content: space-between; align-items: center; }
+  header h1 { margin: 0; font-size: 1.15rem; font-weight: 600; }
+  header a { color: #ffd9b3; font-size: .85rem; text-decoration: none; }
+  main { max-width: 980px; margin: 0 auto; padding: 1rem 1.2rem 3rem; }
+
+  .panel { background: #fff; border: 1px solid var(--borde); border-radius: 8px;
+    padding: 1rem; margin-bottom: 1rem; }
+  .panel h2 { margin: 0 0 .8rem; font-size: 1.02rem; color: var(--marron); }
+
+  /* Campo de escaneo: grande, siempre visible y siempre enfocado. */
+  #escaneo { width: 100%; font-size: 1.35rem; padding: .8rem 1rem;
+    border: 2px solid var(--marron); border-radius: 8px; outline: none; }
+  #escaneo:focus { box-shadow: 0 0 0 3px rgba(78,52,46,.25); }
+  #estado-escaneo { min-height: 1.6rem; margin-top: .5rem; font-size: .95rem; }
+  #estado-escaneo.ok { color: var(--ok); }
+  #estado-escaneo.err { color: var(--err); }
+
+  table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+  th, td { text-align: left; padding: .5rem .55rem; border-bottom: 1px solid var(--borde); }
+  th { background: #f3ece4; color: var(--marron); font-weight: 600; }
+  td.num, th.num { text-align: right; }
+  input.cantidad { width: 4.8rem; padding: .35rem; font-size: 1rem; text-align: right;
+    border: 1px solid var(--borde); border-radius: 6px; }
+  tr.total td { font-weight: 700; background: #f3ece4; border-bottom: none; }
+
+  button.accion { border: 1px solid var(--borde); background: #fff; border-radius: 6px;
+    padding: .3rem .7rem; cursor: pointer; font-size: .85rem; }
+  button.accion:hover { background: #fbe9e7; }
+  button.primario { background: var(--ok); color: #fff; border: none; border-radius: 8px;
+    padding: .8rem 1.6rem; cursor: pointer; font-size: 1.05rem; font-weight: 600; }
+  button.primario:disabled { background: #bbb; cursor: not-allowed; }
+  button.secundario { background: #fff; color: var(--err); border: 1px solid var(--err);
+    border-radius: 8px; padding: .8rem 1.2rem; cursor: pointer; font-size: .95rem; }
+
+  label.obs { display: block; font-size: .85rem; color: var(--marron-claro); margin: .8rem 0; }
+  label.obs input { width: 100%; padding: .5rem; border: 1px solid var(--borde);
+    border-radius: 6px; font-size: .9rem; margin-top: .25rem; }
+
+  #resultado { display: none; }
+  #resultado .cajaok { background: #e8f5e9; border: 1px solid var(--ok); color: var(--ok);
+    border-radius: 8px; padding: 1rem; font-size: 1rem; white-space: pre-wrap; }
+  .muted { color: var(--gris); font-size: .85rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📦 Ingreso de mercadería a bodega</h1>
+  <a href="?page=catalogo">Ir al catálogo →</a>
+</header>
+
+<main>
+  <div class="panel">
+    <h2>Escanear con la pistola</h2>
+    <input id="escaneo" autocomplete="off"
+      placeholder="Escanea una caja o display… (el cursor debe estar aquí)">
+    <div id="estado-escaneo" class="muted">Listo para escanear. Cada lectura agrega
+      1 empaque; volver a escanear el mismo código suma otro.</div>
+  </div>
+
+  <div class="panel">
+    <h2>Ingreso en preparación <span class="muted">(el stock aún no cambia)</span></h2>
+    <div id="carro-vacio" class="muted">Sin productos todavía. Escanea la primera caja o display.</div>
+    <table id="tabla-carro" style="display:none">
+      <thead>
+        <tr><th>Producto</th><th>Formato</th><th class="num">Unid./empaque</th>
+        <th class="num">Cantidad</th><th class="num">Total unidades</th><th></th></tr>
+      </thead>
+      <tbody id="filas-carro"></tbody>
+      <tfoot>
+        <tr class="total"><td colspan="3">TOTAL</td>
+        <td class="num" id="total-empaques">0</td>
+        <td class="num" id="total-unidades">0</td><td></td></tr>
+      </tfoot>
+    </table>
+
+    <label class="obs">Observación (opcional)
+      <input id="observacion" placeholder="p. ej. entrega proveedor Lácteos Sur, guía 4581">
+    </label>
+
+    <div style="display:flex;gap:.8rem;align-items:center;margin-top:.6rem">
+      <button class="primario" id="btn-confirmar" disabled onclick="confirmarIngreso()">
+        CONFIRMAR INGRESO</button>
+      <button class="secundario" onclick="cancelarIngreso()">Cancelar y vaciar</button>
+    </div>
+  </div>
+
+  <div class="panel" id="resultado">
+    <div class="cajaok" id="resultado-texto"></div>
+    <p><button class="accion" onclick="nuevoIngreso()">Iniciar nuevo ingreso</button></p>
+  </div>
+</main>
+
+<script>
+// Carro en preparación (borrador, §23): vive en el navegador y en
+// localStorage. No toca el stock hasta confirmar.
+var carro = [];               // [{codigo_barras, producto_nombre, formato_nombre, unidades_por_empaque, cantidad}]
+var cacheCodigos = {};        // lookups ya resueltos, para escaneo continuo sin esperas
+var procesando = false;
+var ultimoScan = { codigo: '', t: 0 };
+var CLAVE_BORRADOR = 'ingreso_borrador_v1';
+
+function esc(s) {
+  return String(s === null || s === undefined ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+function estado(mensaje, tipo) {
+  var el = document.getElementById('estado-escaneo');
+  el.textContent = mensaje;
+  el.className = tipo || 'muted';
+}
+
+// ------------------------- foco permanente (HID) ---------------------------
+// La pistola escribe como teclado: el campo debe estar SIEMPRE enfocado.
+var campo = document.getElementById('escaneo');
+function reenfocar() {
+  // No robar el foco si el usuario está editando una cantidad u observación.
+  var activo = document.activeElement;
+  if (activo && (activo.classList.contains('cantidad') || activo.id === 'observacion')) return;
+  campo.focus();
+}
+setInterval(reenfocar, 800);
+document.addEventListener('click', function () { setTimeout(reenfocar, 50); });
+
+// La pistola termina con Enter (terminador estándar en modo teclado).
+campo.addEventListener('keydown', function (ev) {
+  if (ev.key !== 'Enter') return;
+  ev.preventDefault();
+  var codigo = campo.value.trim();
+  campo.value = '';
+  if (!codigo) return;
+
+  // Anti doble disparo: la misma lectura física puede llegar duplicada en
+  // milisegundos. Escaneos legítimos repetidos (caja por caja) tardan más.
+  var ahora = Date.now();
+  if (codigo === ultimoScan.codigo && ahora - ultimoScan.t < 300) return;
+  ultimoScan = { codigo: codigo, t: ahora };
+
+  agregarEscaneo(codigo);
+});
+
+// ------------------------------- escaneo -----------------------------------
+function agregarEscaneo(codigo) {
+  var existente = carro.filter(function (i) { return i.codigo_barras === codigo; })[0];
+  if (existente) {
+    existente.cantidad += 1;
+    estado('✔ ' + existente.producto_nombre + ' — ' + existente.formato_nombre +
+      ' → ' + existente.cantidad + ' empaques', 'ok');
+    renderCarro();
+    return;
+  }
+  if (cacheCodigos[codigo]) {
+    agregarAlCarro(cacheCodigos[codigo]);
+    return;
+  }
+  if (procesando) { estado('Procesando escaneo anterior…', 'muted'); return; }
+  procesando = true;
+  estado('Buscando código ' + codigo + '…', 'muted');
+  google.script.run
+    .withSuccessHandler(function (r) {
+      procesando = false;
+      if (!r.encontrado) {
+        estado('✖ Código no registrado: ' + r.codigo_barras +
+          '. Créalo primero en el catálogo.', 'err');
+        return;
+      }
+      cacheCodigos[codigo] = r;
+      agregarAlCarro(r);
+    })
+    .withFailureHandler(function (err) {
+      procesando = false;
+      estado('✖ Error: ' + (err.message || err), 'err');
+    })
+    .movBuscarCodigo(codigo);
+}
+function agregarAlCarro(info) {
+  carro.push({
+    codigo_barras: info.codigo_barras,
+    producto_nombre: info.producto_nombre,
+    formato_nombre: info.formato_nombre,
+    unidades_por_empaque: info.unidades_por_empaque,
+    cantidad: 1
+  });
+  estado('✔ ' + info.producto_nombre + ' — ' + info.formato_nombre + ' (' +
+    info.unidades_por_empaque + ' unid./empaque). Stock actual: ' +
+    info.stock_unidades + ' unidades.', 'ok');
+  renderCarro();
+}
+
+// -------------------------------- carro ------------------------------------
+function renderCarro() {
+  var tabla = document.getElementById('tabla-carro');
+  var vacio = document.getElementById('carro-vacio');
+  var cuerpo = document.getElementById('filas-carro');
+  if (carro.length === 0) {
+    tabla.style.display = 'none';
+    vacio.style.display = '';
+    document.getElementById('btn-confirmar').disabled = true;
+    guardarBorrador();
+    return;
+  }
+  tabla.style.display = '';
+  vacio.style.display = 'none';
+
+  var totalEmpaques = 0, totalUnidades = 0, html = '';
+  carro.forEach(function (item, i) {
+    var unidades = item.cantidad * item.unidades_por_empaque;
+    totalEmpaques += item.cantidad;
+    totalUnidades += unidades;
+    html += '<tr><td>' + esc(item.producto_nombre) + '</td>' +
+      '<td>' + esc(item.formato_nombre) + ' <span class="muted">' +
+        esc(item.codigo_barras) + '</span></td>' +
+      '<td class="num">' + item.unidades_por_empaque + '</td>' +
+      '<td class="num"><input class="cantidad" type="number" min="1" value="' +
+        item.cantidad + '" onchange="cambiarCantidad(' + i + ', this.value)"></td>' +
+      '<td class="num">' + unidades + '</td>' +
+      '<td><button class="accion" onclick="quitarItem(' + i + ')">Quitar</button></td></tr>';
+  });
+  cuerpo.innerHTML = html;
+  document.getElementById('total-empaques').textContent = totalEmpaques;
+  document.getElementById('total-unidades').textContent = totalUnidades;
+  document.getElementById('btn-confirmar').disabled = false;
+  guardarBorrador();
+}
+function cambiarCantidad(indice, valor) {
+  var n = parseInt(valor, 10);
+  if (isNaN(n) || n < 1) { renderCarro(); return; }
+  carro[indice].cantidad = n;
+  renderCarro();
+}
+function quitarItem(indice) {
+  carro.splice(indice, 1);
+  renderCarro();
+}
+
+// ------------------------------ borrador -----------------------------------
+function guardarBorrador() {
+  try {
+    localStorage.setItem(CLAVE_BORRADOR, JSON.stringify({
+      carro: carro,
+      observacion: document.getElementById('observacion').value
+    }));
+  } catch (e) { /* almacenamiento no disponible: el carro sigue en memoria */ }
+}
+function restaurarBorrador() {
+  try {
+    var crudo = localStorage.getItem(CLAVE_BORRADOR);
+    if (!crudo) return;
+    var borrador = JSON.parse(crudo);
+    if (borrador.carro && borrador.carro.length) {
+      carro = borrador.carro;
+      document.getElementById('observacion').value = borrador.observacion || '';
+      estado('Se restauró un ingreso en preparación que no fue confirmado.', 'ok');
+      renderCarro();
+    }
+  } catch (e) { /* borrador corrupto: se ignora */ }
+}
+function limpiarBorrador() {
+  try { localStorage.removeItem(CLAVE_BORRADOR); } catch (e) { /* sin efecto */ }
+}
+
+// ---------------------------- confirmación ---------------------------------
+function confirmarIngreso() {
+  if (carro.length === 0) return;
+  var boton = document.getElementById('btn-confirmar');
+  boton.disabled = true; // §12.3: bloquear mientras se procesa
+  boton.textContent = 'Procesando…';
+  estado('Confirmando ingreso…', 'muted');
+
+  google.script.run
+    .withSuccessHandler(function (r) {
+      limpiarBorrador();
+      carro = [];
+      var lineas = r.detalles.map(function (d) {
+        return '  • ' + d.producto + ' — ' + d.formato + ': ' + d.cantidad_empaques +
+          ' empaques = +' + d.unidades + ' unidades (stock: ' + d.stock_posterior + ')';
+      });
+      document.getElementById('resultado-texto').textContent =
+        'INGRESO CONFIRMADO — ' + r.movimiento_id + '\n' +
+        r.fecha_hora + '\n' + lineas.join('\n') +
+        '\nTotal: +' + r.total_unidades + ' unidades.';
+      document.getElementById('resultado').style.display = '';
+      renderCarro();
+      document.getElementById('observacion').value = '';
+      boton.textContent = 'CONFIRMAR INGRESO';
+      estado('Ingreso registrado. Puedes iniciar uno nuevo.', 'ok');
+    })
+    .withFailureHandler(function (err) {
+      boton.disabled = false;
+      boton.textContent = 'CONFIRMAR INGRESO';
+      estado('✖ No se confirmó: ' + (err.message || err) +
+        ' El ingreso quedó en preparación para corregirlo.', 'err');
+    })
+    .movConfirmar({
+      tipo: 'ENTRADA',
+      origen: 'PROVEEDOR',
+      destino: 'BODEGA',
+      observacion: document.getElementById('observacion').value,
+      items: carro.map(function (i) {
+        return { codigo_barras: i.codigo_barras, cantidad_empaques: i.cantidad };
+      })
+    });
+}
+function cancelarIngreso() {
+  if (carro.length && !confirm('¿Vaciar el ingreso en preparación? No se registró nada.')) return;
+  carro = [];
+  limpiarBorrador();
+  document.getElementById('observacion').value = '';
+  document.getElementById('resultado').style.display = 'none';
+  renderCarro();
+  estado('Ingreso cancelado. Listo para escanear.', 'muted');
+}
+function nuevoIngreso() {
+  document.getElementById('resultado').style.display = 'none';
+  reenfocar();
+}
+
+document.getElementById('observacion').addEventListener('change', guardarBorrador);
+restaurarBorrador();
+renderCarro();
+reenfocar();
+</script>
+</body>
+</html>

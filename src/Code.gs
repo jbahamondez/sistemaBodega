@@ -13,6 +13,11 @@ function doGet(e) {
       .setTitle('Catálogo — Sistema Bodega')
       .addMetaTag('viewport', 'width=device-width, initial-scale=1');
   }
+  if (page === 'ingreso') {
+    return HtmlService.createHtmlOutputFromFile('IngresoUi')
+      .setTitle('Ingreso — Sistema Bodega')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  }
 
   var estado = codeEstadoFundacion_();
   var html = HtmlService.createHtmlOutput(
@@ -27,7 +32,8 @@ function doGet(e) {
     '<li>Hojas del modelo: ' + estado.hojasExistentes + ' de ' + estado.hojasEsperadas + '</li>' +
     '<li>Usuarios registrados: ' + estado.usuarios + '</li>' +
     '</ul>' +
-    '<p><a href="?page=catalogo">→ Administración del catálogo</a></p>' +
+    '<p><a href="?page=catalogo">→ Administración del catálogo</a><br>' +
+    '<a href="?page=ingreso">→ Ingreso de mercadería (pistola)</a></p>' +
     '<p>Las pantallas de ingreso, retiro y consulta se habilitan en las próximas fases.</p>' +
     '</body></html>'
   );

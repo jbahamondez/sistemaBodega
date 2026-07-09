@@ -47,6 +47,7 @@ src/
   Importacion.gs    Plantilla, previsualización y aplicación de cargas masivas
   Inventario.gs     Consulta de stock (la escritura solo ocurre vía movimientos)
   Movimientos.gs    Confirmación transaccional: bloqueo → releer → validar → escribir
+  IngresoUi.html    Pantalla de ingreso para jefatura (pistola HID, PC)
   CatalogoUi.html   Interfaz de administración del catálogo (jefatura, PC)
   Code.gs           Punto de entrada web (doGet + routing)
   SelfTest.gs       Pruebas (ejecutables en el editor y localmente con npm test)
@@ -112,6 +113,21 @@ tratan siempre como texto (se preservan ceros iniciales).
 > ajustar únicamente `CONFIG.IMPORT_PLANILLA` en [src/Config.gs](src/Config.gs)
 > (encabezados y obligatoriedad); la lógica de importación no cambia.
 
+## Ingreso de mercadería (Fase 4)
+
+La pantalla de ingreso vive en `?page=ingreso` (PC de jefatura):
+
+- El campo de escaneo mantiene el **foco permanente**: la pistola (modo HID,
+  termina con Enter) escribe directo sin tocar el mouse.
+- Cada lectura agrega 1 empaque; re-escanear el mismo código suma otro. Un
+  filtro de 300 ms descarta el doble disparo de una misma lectura física.
+- El carro muestra empaques, unidades por empaque y total de unidades; las
+  cantidades se corrigen a mano y el borrador sobrevive en el navegador si
+  se cierra la pestaña (localStorage).
+- **El stock no cambia hasta CONFIRMAR INGRESO**: la confirmación es la
+  transacción de `movConfirmar` (tipo ENTRADA) con bloqueo y relectura.
+- Código no registrado → mensaje claro y enlace al catálogo para crearlo.
+
 ## Validación local (desarrollo)
 
 Requiere Node.js. Instalar dependencias una vez con `npm install` y luego:
@@ -143,7 +159,7 @@ símbolos usados entre archivos.
 | 1 | Fundación: estructura, configuración, hojas, acceso a datos, IDs, validaciones | ✅ Completada |
 | 2 | Catálogo: CRUD manual, plantilla, importación con previsualización, exportación, historial | ✅ Completada |
 | 3 | Inventario: consulta y actualización segura con concurrencia | ✅ Completada |
-| 4 | Ingreso de jefatura (pistola HID) | Pendiente |
+| 4 | Ingreso de jefatura (pistola HID) | ✅ Completada |
 | 5 | Retiro móvil (cámara Android) | Pendiente |
 | 6 | Panel de jefatura: dashboard, movimientos, trazabilidad | Pendiente |
 | 7 | Usuarios y permisos (validación en servidor) | Pendiente |

@@ -274,6 +274,14 @@ function testMovimientosCasos_() {
   assert_(invGetStock(producto.producto_id) === 118,
     'Caso 5: el movimiento nuevo usa 18 unidades por display (100 + 18)');
 
+  // Lookup de escaneo: devuelve producto, formato vigente y stock actual.
+  var lookup = movBuscarCodigo('TEST-DSP-001');
+  assert_(lookup.encontrado && lookup.producto_nombre === 'TEST Chocolate Bitter' &&
+          lookup.unidades_por_empaque === 18 && lookup.stock_unidades === 118,
+    'movBuscarCodigo entrega formato vigente (18) y stock actual (118)');
+  assert_(movBuscarCodigo('NO-EXISTE-999').encontrado === false,
+    'movBuscarCodigo indica código no registrado');
+
   // Código no registrado se rechaza con mensaje claro (§22).
   lanzo = false;
   try {

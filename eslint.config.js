@@ -101,6 +101,7 @@ const projectGlobals = {
   invActualizarStock_: 'readonly',
   // Movimientos.gs
   movConfirmar: 'readonly',
+  movBuscarCodigo: 'readonly',
   movResolverItem_: 'readonly',
   movListar: 'readonly',
   movObtenerDetalle: 'readonly',
