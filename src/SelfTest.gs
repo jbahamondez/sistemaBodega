@@ -167,7 +167,8 @@ function runMovimientoTests() {
 
   var resultados = [];
   var tests = [testMovimientosCasos_, testAuthYPermisos_,
-    testCorreccionCaso6_, testImportacionCasos_, testHttpRouter_];
+    testCorreccionCaso6_, testImportacionCasos_, testHttpRouter_,
+    testPlanillaRealChocolateria_];
   tests.forEach(function (t) {
     try {
       t();
@@ -538,6 +539,52 @@ function testHttpRouter_() {
   var rota = doPost({ postData: { contents: 'esto no es json' } });
   assert_(JSON.parse(rota.getContent()).ok === false,
     'router: JSON inválido manejado');
+}
+
+/**
+ * Planilla real de la chocolatería (D-023): encabezados con alias
+ * (Cod producto / Descripcion del producto (Nombre) / EAN / Cantidad),
+ * decimales de Excel ("8.0") y derivación de formato desde las unidades.
+ */
+function testPlanillaRealChocolateria_() {
+  var csv = 'Cod producto,Descripcion del producto (Nombre),EAN,Nombre de tienda,Cantidad\n' +
+    '100355,CORNET NUXOR MILK 150G,8003340807409,Costanera Center,8.0\n' +
+    '100042,LINDOR BALL HAZELNUT (12.5G) 10KG,7610400276429,Costanera Center,1.0\n';
+
+  var prev = importacionPrevisualizar_(csv, 'AGREGAR_Y_ACTUALIZAR');
+  assert_(prev.ok, 'planilla real: estructura aceptada vía alias');
+  assert_(prev.resumen.NUEVO === 2 && prev.resumen.ERROR === 0,
+    'planilla real: 2 filas nuevas sin errores');
+
+  var cornet = prev.filas[0].datos;
+  assert_(cornet.codigo_producto === '100355' &&
+          cornet.nombre_producto === 'CORNET NUXOR MILK 150G' &&
+          cornet.codigo_barras === '8003340807409',
+    'planilla real: alias mapean código, nombre y EAN');
+  assert_(cornet.unidades_por_empaque === '8',
+    'planilla real: "8.0" de Excel normalizado a 8');
+  assert_(cornet.nombre_formato === 'Caja x 8' && cornet.tipo_empaque === 'CAJA',
+    'planilla real: formato derivado Caja x 8 / CAJA');
+
+  var lindor = prev.filas[1].datos;
+  assert_(lindor.nombre_formato === 'Unidad' && lindor.tipo_empaque === 'UNIDAD',
+    'planilla real: cantidad 1 deriva Unidad/UNIDAD');
+
+  var res = importacionAplicar_(csv, 'AGREGAR_Y_ACTUALIZAR', 'cruce_real.csv');
+  assert_(res.detalle.productosCreados === 2 && res.detalle.formatosCreados === 2,
+    'planilla real: importación aplicada');
+  var buscado = movBuscarCodigo_('8003340807409');
+  assert_(buscado.encontrado && buscado.unidades_por_empaque === 8,
+    'planilla real: el EAN queda escaneable con 8 unidades por caja');
+
+  // La plantilla oficial sigue funcionando igual (los alias no la rompen).
+  var prevOficial = importacionPrevisualizar_(
+    'codigo_producto,nombre_producto,categoria,codigo_barras,nombre_formato,' +
+    'tipo_empaque,unidades_por_empaque,activo\n' +
+    'OF-1,Producto Oficial,Cat,780555000111,Display 5,DISPLAY,5,SI\n',
+    'AGREGAR_Y_ACTUALIZAR');
+  assert_(prevOficial.ok && prevOficial.filas[0].datos.tipo_empaque === 'DISPLAY',
+    'plantilla oficial: sin cambios de comportamiento');
 }
 
 /** Integración: requiere setupDatabase() ejecutado. Se omite si no lo está. */

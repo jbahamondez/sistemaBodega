@@ -159,20 +159,26 @@ var CONFIG = {
    * Mapeo de la planilla de carga masiva del catálogo.
    *
    * ÚNICO punto que define qué columnas tiene la planilla y a qué campo del
-   * sistema corresponde cada una. La planilla definitiva de la chocolatería
-   * aún no existe: cuando exista, ajustar solo esta lista (encabezados,
-   * obligatoriedad) sin tocar la lógica de importación.
+   * sistema corresponde cada una. `aliases` permite aceptar directamente los
+   * encabezados de la planilla real de la chocolatería
+   * ("Cruce_Productos_SKU_Final_con_EAN": Cod producto / Descripcion del
+   * producto (Nombre) / EAN / Cantidad) además de los de la plantilla
+   * oficial. La comparación ignora mayúsculas y espacios en los bordes.
+   *
+   * nombre_formato y tipo_empaque son opcionales: si faltan, se derivan de
+   * unidades_por_empaque (1 → "Unidad"/UNIDAD; N > 1 → "Caja x N"/CAJA),
+   * decisión del usuario 2026-07-09 (D-023).
    */
   IMPORT_PLANILLA: {
     columns: [
-      { header: 'codigo_producto',      required: false },
-      { header: 'nombre_producto',      required: true },
-      { header: 'categoria',            required: false },
-      { header: 'codigo_barras',        required: true },
-      { header: 'nombre_formato',       required: true },
-      { header: 'tipo_empaque',         required: true },
-      { header: 'unidades_por_empaque', required: true },
-      { header: 'activo',               required: false }
+      { header: 'codigo_producto',      required: false, aliases: ['cod producto'] },
+      { header: 'nombre_producto',      required: true,  aliases: ['descripcion del producto (nombre)'] },
+      { header: 'categoria',            required: false, aliases: [] },
+      { header: 'codigo_barras',        required: true,  aliases: ['ean'] },
+      { header: 'nombre_formato',       required: false, aliases: [] },
+      { header: 'tipo_empaque',         required: false, aliases: [] },
+      { header: 'unidades_por_empaque', required: true,  aliases: ['cantidad'] },
+      { header: 'activo',               required: false, aliases: [] }
     ],
     exampleRows: [
       ['PROD-EJ1', 'Chocolate Bitter', 'Chocolates', '780123456789', 'Display 15', 'DISPLAY', '15', 'SI'],

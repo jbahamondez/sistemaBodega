@@ -56,12 +56,18 @@ function importacionPrevisualizar_(csvText, modo) {
   }
 
   // Mapear encabezados de la planilla a índices de columna (tolerante a
-  // mayúsculas y columnas extra, p. ej. un catálogo exportado y editado).
+  // mayúsculas, columnas extra y a los alias de la planilla real de la
+  // chocolatería, p. ej. "EAN" → codigo_barras).
   var headers = parsed.rows[0].map(function (h) { return utilTrim(h).toLowerCase(); });
   var indice = {};
   var faltantes = [];
   CONFIG.IMPORT_PLANILLA.columns.forEach(function (col) {
-    var idx = headers.indexOf(col.header.toLowerCase());
+    var candidatos = [col.header.toLowerCase()]
+      .concat((col.aliases || []).map(function (a) { return a.toLowerCase(); }));
+    var idx = -1;
+    for (var i = 0; i < candidatos.length && idx === -1; i++) {
+      idx = headers.indexOf(candidatos[i]);
+    }
     if (idx === -1 && col.required) faltantes.push(col.header);
     indice[col.header] = idx;
   });
@@ -244,16 +250,40 @@ function importacionLeerFila_(row, indice) {
     var idx = indice[header];
     return idx === -1 || idx === undefined ? '' : utilTrim(row[idx]);
   }
-  return {
+  var datos = {
     codigo_producto: leer('codigo_producto'),
     nombre_producto: leer('nombre_producto'),
     categoria: leer('categoria'),
     codigo_barras: utilNormalizeBarcode(leer('codigo_barras')),
     nombre_formato: leer('nombre_formato'),
     tipo_empaque: leer('tipo_empaque').toUpperCase(),
-    unidades_por_empaque: leer('unidades_por_empaque'),
+    unidades_por_empaque: importacionNormalizarEntero_(leer('unidades_por_empaque')),
     activo: leer('activo') === '' ? CONFIG.BOOL.SI : leer('activo').toUpperCase()
   };
+
+  // Derivación de formato (D-023): la planilla real no trae nombre ni tipo
+  // de empaque; se generan desde las unidades. Solo cuando vienen vacíos.
+  var unidades = utilToInt(datos.unidades_por_empaque);
+  if (datos.nombre_formato === '' && unidades !== null && unidades > 0) {
+    datos.nombre_formato = unidades === 1 ? 'Unidad' : 'Caja x ' + unidades;
+  }
+  if (datos.tipo_empaque === '' && unidades !== null && unidades > 0) {
+    datos.tipo_empaque = unidades === 1
+      ? CONFIG.TIPOS_EMPAQUE.UNIDAD
+      : CONFIG.TIPOS_EMPAQUE.CAJA;
+  }
+  return datos;
+}
+
+/**
+ * Normaliza enteros que Excel exporta como decimales ("10.0" → "10").
+ * Deja intactos los valores no numéricos para que la validación los reporte.
+ */
+function importacionNormalizarEntero_(valor) {
+  if (/^\d+[.,]0+$/.test(valor)) {
+    return valor.replace(/[.,]0+$/, '');
+  }
+  return valor;
 }
 
 /** Validaciones por fila (§8.5). Devuelve la lista de errores. */

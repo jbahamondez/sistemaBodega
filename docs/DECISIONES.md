@@ -195,3 +195,18 @@ interfaz `Sesion` sobre fetch, por lo que la lógica de las páginas no
 cambió. La URL de la API vive únicamente en `web/config.js`; el backend se
 actualiza con `clasp push` + `clasp update-deployment <id>` para conservar
 la misma URL.
+
+## D-023 — Adaptación a la planilla real "Cruce_Productos_SKU_Final_con_EAN"
+
+La planilla definitiva llegó el 2026-07-09 con columnas: Cod producto,
+Descripcion del producto (Nombre), EAN, Nombre de tienda, Cantidad. Decisiones
+confirmadas con el usuario: "Cantidad" son las unidades por empaque (múltiplo
+IC); "Nombre de tienda" se ignora (el MVP controla una sola bodega); y el
+formato se deriva automáticamente cuando la planilla no lo trae (1 → "Unidad"
+tipo UNIDAD; N>1 → "Caja x N" tipo CAJA). Implementación: `aliases` por
+columna en CONFIG.IMPORT_PLANILLA (la lógica de importación no cambió),
+normalización de decimales de Excel ("8.0" → 8) y derivación solo cuando los
+campos vienen vacíos — la plantilla oficial sigue funcionando igual.
+Herramientas nuevas: scripts/leer-xlsx.ps1 (leer Excel sin Excel instalado) y
+scripts/previsualizar-csv.js (ensayo de importación con el motor real sobre
+base simulada). El ensayo con los 128 productos reales dio 0 errores.
