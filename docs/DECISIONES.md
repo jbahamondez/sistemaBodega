@@ -119,3 +119,24 @@ también localmente con `npm test`: `scripts/run-tests.js` carga todos los
 `.gs` en un contexto V8 compartido (igual que Apps Script) con mocks mínimos
 de `Utilities`, `PropertiesService`, `LockService` y `Logger`. Las pruebas de
 integración que requieren la BD real se omiten solas fuera de Apps Script.
+
+## D-016 — Toda variación de stock pasa por `movConfirmar`
+
+`Movimientos.gs` expone un único camino transaccional para ENTRADA, RETIRO,
+AJUSTE y REVERSA: bloqueo → releer catálogo y stock vigentes → validar el
+movimiento completo (si un ítem falla, no se escribe nada) → cabecera
+`EN_PROCESO` → detalles con snapshots y stock anterior/posterior →
+inventario → cabecera `CONFIRMADO`. `invActualizarStock_` es interna y solo
+se invoca dentro de esa transacción. AJUSTE y REVERSA aceptan cantidades
+negativas (correcciones en ambos sentidos, §17); ENTRADA y RETIRO solo
+positivas.
+
+## D-017 — Pruebas de movimientos protegidas con `entorno=TEST`
+
+`runMovimientoTests()` escribe datos de prueba, así que se niega a correr
+salvo que la hoja Configuracion tenga `entorno=TEST`. El runner local usa
+una simulación en memoria de Sheets (clases MockSheet/MockSpreadsheet en
+`scripts/run-tests.js`) y activa la clave automáticamente; contra la BD real
+habría que fijarla a propósito. La concurrencia real (Caso 4) no es
+simulable localmente: el diseño la cubre con `LockService` + relectura bajo
+bloqueo, y debe verificarse manualmente en la Fase 8 con dos dispositivos.

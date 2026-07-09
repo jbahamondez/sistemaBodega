@@ -95,8 +95,21 @@ const projectGlobals = {
   importacionAplicarNuevo_: 'readonly',
   importacionAplicarActualizacion_: 'readonly',
   importacionResultadoVacio_: 'readonly',
+  // Inventario.gs
+  invGetStock: 'readonly',
+  invListar: 'readonly',
+  invActualizarStock_: 'readonly',
+  // Movimientos.gs
+  movConfirmar: 'readonly',
+  movResolverItem_: 'readonly',
+  movListar: 'readonly',
+  movObtenerDetalle: 'readonly',
+  movTrazabilidadProducto: 'readonly',
+  // Setup.gs
+  setupDatabase: 'readonly',
   // SelfTest.gs
-  assert_: 'readonly'
+  assert_: 'readonly',
+  runMovimientoTests: 'readonly'
 };
 
 module.exports = [

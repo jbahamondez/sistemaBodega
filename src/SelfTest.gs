@@ -150,6 +150,141 @@ function testPlantillaImportacion_() {
     'plantilla incluye las filas de ejemplo');
 }
 
+/**
+ * Pruebas de movimientos e inventario (Casos obligatorios 1, 2, 3 y 5 del
+ * prompt §29). ESCRIBEN datos de prueba, por lo que SOLO corren si la hoja
+ * Configuracion tiene la clave entorno=TEST. El runner local (npm test) usa
+ * una base simulada en memoria y activa esa clave automáticamente; en el
+ * editor de Apps Script hay que fijarla a propósito sobre una BD de prueba.
+ */
+function runMovimientoTests() {
+  if (dbGetConfigValue('entorno') !== 'TEST') {
+    throw new Error(
+      'runMovimientoTests escribe datos de prueba. Solo se ejecuta si la ' +
+      'hoja Configuracion tiene la clave "entorno" con valor "TEST" ' +
+      '(usar una base de datos de prueba, nunca la real).');
+  }
+
+  var resultados = [];
+  var tests = [testMovimientosCasos_];
+  tests.forEach(function (t) {
+    try {
+      t();
+      resultados.push('OK    ' + t.name);
+    } catch (err) {
+      resultados.push('FALLO ' + t.name + ' → ' + err.message);
+    }
+  });
+  var reporte = resultados.join('\n');
+  Logger.log(reporte);
+  if (reporte.indexOf('FALLO') !== -1) {
+    throw new Error('Hay pruebas fallidas:\n' + reporte);
+  }
+  return reporte;
+}
+
+function testMovimientosCasos_() {
+  // Preparación: producto de prueba con formato unitario y display de 15.
+  var producto = catalogoCrearProducto({
+    nombre: 'TEST Chocolate Bitter', codigo_producto: 'TEST-001',
+    categoria: 'Test'
+  });
+  catalogoCrearFormato({
+    producto_id: producto.producto_id, codigo_barras: 'TEST-UNI-001',
+    nombre_formato: 'Unidad', tipo_empaque: 'UNIDAD', unidades_por_empaque: 1
+  });
+  var display = catalogoCrearFormato({
+    producto_id: producto.producto_id, codigo_barras: 'TEST-DSP-001',
+    nombre_formato: 'Display 15', tipo_empaque: 'DISPLAY', unidades_por_empaque: 15
+  });
+
+  // Stock inicial 100 mediante AJUSTE (todo cambio de stock es un movimiento).
+  movConfirmar({
+    tipo: 'AJUSTE', usuarioNombre: 'Test', observacion: 'stock inicial de prueba',
+    items: [{ codigo_barras: 'TEST-UNI-001', cantidad_empaques: 100 }]
+  });
+  assert_(invGetStock(producto.producto_id) === 100, 'stock inicial 100');
+
+  // Caso 1: ENTRADA de 2 displays × 15 sobre 100 → 130.
+  var entrada = movConfirmar({
+    tipo: 'ENTRADA', usuarioNombre: 'Test',
+    items: [{ codigo_barras: 'TEST-DSP-001', cantidad_empaques: 2 }]
+  });
+  assert_(invGetStock(producto.producto_id) === 130, 'Caso 1: 100 + 30 = 130');
+  var detalleEntrada = movObtenerDetalle(entrada.movimiento_id);
+  assert_(detalleEntrada.cabecera.estado === 'CONFIRMADO', 'entrada CONFIRMADA');
+  assert_(utilToInt(detalleEntrada.detalles[0].stock_anterior) === 100 &&
+          utilToInt(detalleEntrada.detalles[0].stock_posterior) === 130,
+    'detalle registra stock anterior 100 y posterior 130');
+
+  // Caso 2: RETIRO de 2 displays × 15 sobre 130 → 100.
+  movConfirmar({
+    tipo: 'RETIRO', usuarioNombre: 'Test',
+    items: [{ codigo_barras: 'TEST-DSP-001', cantidad_empaques: 2 }]
+  });
+  assert_(invGetStock(producto.producto_id) === 100, 'Caso 2: 130 - 30 = 100');
+
+  // Caso 3: RETIRO de 8 displays (120) sobre 100 → rechazado, nada cambia.
+  var movimientosAntes = movListar({}).length;
+  var lanzo = false;
+  try {
+    movConfirmar({
+      tipo: 'RETIRO', usuarioNombre: 'Test',
+      items: [{ codigo_barras: 'TEST-DSP-001', cantidad_empaques: 8 }]
+    });
+  } catch (e) {
+    lanzo = true;
+    assert_(e.message.indexOf('Stock insuficiente') !== -1,
+      'Caso 3: error informa stock insuficiente');
+  }
+  assert_(lanzo, 'Caso 3: el retiro excedido lanza error');
+  assert_(invGetStock(producto.producto_id) === 100, 'Caso 3: stock intacto en 100');
+  assert_(movListar({}).length === movimientosAntes,
+    'Caso 3: no se registró ningún movimiento confirmado');
+
+  // Atomicidad multi-ítem: si un ítem del carro no tiene stock, no se aplica nada.
+  lanzo = false;
+  try {
+    movConfirmar({
+      tipo: 'RETIRO', usuarioNombre: 'Test',
+      items: [
+        { codigo_barras: 'TEST-UNI-001', cantidad_empaques: 10 },
+        { codigo_barras: 'TEST-DSP-001', cantidad_empaques: 99 }
+      ]
+    });
+  } catch (e) { lanzo = true; }
+  assert_(lanzo && invGetStock(producto.producto_id) === 100,
+    'carro con un ítem sin stock: no se confirma parcialmente');
+
+  // Caso 5: cambiar el formato 15 → 18 no toca stock ni históricos.
+  catalogoEditarFormato(display.formato_id, { unidades_por_empaque: 18 });
+  assert_(invGetStock(producto.producto_id) === 100,
+    'Caso 5/10: editar el catálogo no recalcula stock');
+  var historicos = movTrazabilidadProducto(producto.producto_id);
+  var conDisplay = historicos.filter(function (h) { return h.formato === 'Display 15'; });
+  assert_(conDisplay.length > 0 && conDisplay.every(function (h) {
+    return h.unidades_por_empaque === 15;
+  }), 'Caso 5: los movimientos históricos conservan el snapshot de 15');
+
+  // Y un movimiento nuevo usa la equivalencia vigente (18).
+  movConfirmar({
+    tipo: 'ENTRADA', usuarioNombre: 'Test',
+    items: [{ codigo_barras: 'TEST-DSP-001', cantidad_empaques: 1 }]
+  });
+  assert_(invGetStock(producto.producto_id) === 118,
+    'Caso 5: el movimiento nuevo usa 18 unidades por display (100 + 18)');
+
+  // Código no registrado se rechaza con mensaje claro (§22).
+  lanzo = false;
+  try {
+    movConfirmar({ tipo: 'RETIRO', usuarioNombre: 'Test',
+      items: [{ codigo_barras: 'NO-EXISTE-999', cantidad_empaques: 1 }] });
+  } catch (e) {
+    lanzo = e.message.indexOf('Código no registrado') !== -1;
+  }
+  assert_(lanzo, 'código desconocido rechazado con mensaje claro');
+}
+
 /** Integración: requiere setupDatabase() ejecutado. Se omite si no lo está. */
 function testIdGenerationIntegration_() {
   try {

@@ -45,6 +45,8 @@ src/
   Historial.gs      Trazabilidad de cambios del catálogo
   Catalogo.gs       CRUD de productos/formatos, estados, búsqueda por código, exportación
   Importacion.gs    Plantilla, previsualización y aplicación de cargas masivas
+  Inventario.gs     Consulta de stock (la escritura solo ocurre vía movimientos)
+  Movimientos.gs    Confirmación transaccional: bloqueo → releer → validar → escribir
   CatalogoUi.html   Interfaz de administración del catálogo (jefatura, PC)
   Code.gs           Punto de entrada web (doGet + routing)
   SelfTest.gs       Pruebas (ejecutables en el editor y localmente con npm test)
@@ -140,7 +142,7 @@ símbolos usados entre archivos.
 |---|---|---|
 | 1 | Fundación: estructura, configuración, hojas, acceso a datos, IDs, validaciones | ✅ Completada |
 | 2 | Catálogo: CRUD manual, plantilla, importación con previsualización, exportación, historial | ✅ Completada |
-| 3 | Inventario: consulta y actualización segura con concurrencia | Pendiente |
+| 3 | Inventario: consulta y actualización segura con concurrencia | ✅ Completada |
 | 4 | Ingreso de jefatura (pistola HID) | Pendiente |
 | 5 | Retiro móvil (cámara Android) | Pendiente |
 | 6 | Panel de jefatura: dashboard, movimientos, trazabilidad | Pendiente |
