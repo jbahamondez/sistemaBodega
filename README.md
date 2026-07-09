@@ -81,6 +81,20 @@ convierten a notación científica.
 6. Publicar: *Implementar → Nueva implementación → Aplicación web*.
    La URL resultante se usa desde el PC de jefatura y los celulares Android.
 
+## Validación local (desarrollo)
+
+Requiere Node.js. Instalar dependencias una vez con `npm install` y luego:
+
+```
+npm run check   # ESLint (referencias entre archivos, variables no definidas) + sintaxis V8
+npm run lint    # solo ESLint
+```
+
+Al crear un módulo `.gs` nuevo, agregar sus funciones públicas a
+`projectGlobals` en [eslint.config.js](eslint.config.js) — los archivos de
+Apps Script comparten un único ámbito global y ESLint necesita conocer los
+símbolos usados entre archivos.
+
 ## Dispositivos de escaneo
 
 - **Pistola escaneadora (jefatura, PC)**: se usa en modo HID (teclado). La

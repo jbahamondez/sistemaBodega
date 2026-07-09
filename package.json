@@ -1,0 +1,13 @@
+{
+  "name": "sistema-bodega",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Sistema de control y trazabilidad de bodega - Chocolatería (Google Apps Script + Sheets)",
+  "scripts": {
+    "lint": "eslint src",
+    "check": "eslint src && node scripts/syntax-check.js"
+  },
+  "devDependencies": {
+    "eslint": "^9.0.0"
+  }
+}
