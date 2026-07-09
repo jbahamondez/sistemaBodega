@@ -35,14 +35,19 @@ Reglas de arquitectura:
 ```
 src/
   appsscript.json   Manifiesto (zona horaria, V8, webapp)
-  Config.gs         Configuración central: hojas, columnas, roles, tipos, IDs
-  Utils.gs          Utilidades puras (fechas, texto, códigos de barras, hash de PIN)
+  Config.gs         Configuración central: hojas, columnas, roles, tipos, IDs,
+                    mapeo de la planilla de importación (IMPORT_PLANILLA)
+  Utils.gs          Utilidades puras (fechas, texto, códigos de barras, CSV, hash de PIN)
   Validation.gs     Validaciones base reutilizables
   Db.gs             Capa de acceso a datos (única que toca Sheets)
   Ids.gs            Generación de IDs únicos bajo bloqueo (PROD-0001, MOV-000001…)
   Setup.gs          Inicialización idempotente de la base de datos y primer usuario
-  Code.gs           Punto de entrada web (doGet)
-  SelfTest.gs       Pruebas de la fundación
+  Historial.gs      Trazabilidad de cambios del catálogo
+  Catalogo.gs       CRUD de productos/formatos, estados, búsqueda por código, exportación
+  Importacion.gs    Plantilla, previsualización y aplicación de cargas masivas
+  CatalogoUi.html   Interfaz de administración del catálogo (jefatura, PC)
+  Code.gs           Punto de entrada web (doGet + routing)
+  SelfTest.gs       Pruebas (ejecutables en el editor y localmente con npm test)
 ```
 
 ## Modelo de datos (hojas)
@@ -81,13 +86,38 @@ convierten a notación científica.
 6. Publicar: *Implementar → Nueva implementación → Aplicación web*.
    La URL resultante se usa desde el PC de jefatura y los celulares Android.
 
+## Catálogo (Fase 2)
+
+La administración del catálogo vive en la URL de la web app con
+`?page=catalogo`. Permite:
+
+- **CRUD manual**: crear/editar productos y formatos, activar/desactivar
+  (con advertencia si hay stock o movimientos; nunca se elimina historial).
+- **Plantilla**: descarga de la plantilla CSV oficial con instrucciones.
+- **Importación**: cargar CSV (archivo o pegado) → validar → previsualizar
+  (nuevos / a actualizar con diffs "15 → 18" / sin cambios / errores por
+  fila) → confirmar. Modos: solo agregar, solo actualizar, o ambos. Los
+  registros ausentes de la planilla nunca se eliminan ni desactivan.
+- **Exportación**: catálogo completo a CSV, editable y reimportable.
+- **Historial**: cada cambio queda con usuario, fecha, campo, valor
+  anterior/nuevo y origen (manual o importación).
+
+Reglas duras: cambiar el catálogo **jamás** modifica el stock ni los
+movimientos históricos (estos guardan snapshots), y los códigos de barras se
+tratan siempre como texto (se preservan ceros iniciales).
+
+> **La planilla definitiva de la chocolatería aún no existe.** Cuando exista,
+> ajustar únicamente `CONFIG.IMPORT_PLANILLA` en [src/Config.gs](src/Config.gs)
+> (encabezados y obligatoriedad); la lógica de importación no cambia.
+
 ## Validación local (desarrollo)
 
 Requiere Node.js. Instalar dependencias una vez con `npm install` y luego:
 
 ```
-npm run check   # ESLint (referencias entre archivos, variables no definidas) + sintaxis V8
+npm run check   # ESLint + sintaxis V8 + pruebas locales (todo junto)
 npm run lint    # solo ESLint
+npm test        # solo pruebas (SelfTest.gs con mocks de servicios Google)
 ```
 
 Al crear un módulo `.gs` nuevo, agregar sus funciones públicas a
@@ -109,7 +139,7 @@ símbolos usados entre archivos.
 | Fase | Contenido | Estado |
 |---|---|---|
 | 1 | Fundación: estructura, configuración, hojas, acceso a datos, IDs, validaciones | ✅ Completada |
-| 2 | Catálogo: CRUD manual, plantilla, importación con previsualización, exportación, historial | Pendiente |
+| 2 | Catálogo: CRUD manual, plantilla, importación con previsualización, exportación, historial | ✅ Completada |
 | 3 | Inventario: consulta y actualización segura con concurrencia | Pendiente |
 | 4 | Ingreso de jefatura (pistola HID) | Pendiente |
 | 5 | Retiro móvil (cámara Android) | Pendiente |

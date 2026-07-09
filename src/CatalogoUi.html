@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catálogo — Sistema Bodega</title>
+<style>
+  :root {
+    --marron: #4e342e; --marron-claro: #6d4c41; --crema: #faf6f1;
+    --ok: #2e7d32; --err: #c62828; --warn: #ef6c00; --gris: #757575;
+    --borde: #e0d7ce;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; margin: 0; background: var(--crema); color: #2b2b2b; }
+  header { background: var(--marron); color: #fff; padding: .8rem 1.2rem; }
+  header h1 { margin: 0; font-size: 1.15rem; font-weight: 600; }
+  main { max-width: 1080px; margin: 0 auto; padding: 1rem 1.2rem 3rem; }
+
+  .tabs { display: flex; gap: .4rem; margin: 1rem 0; }
+  .tabs button { border: 1px solid var(--borde); background: #fff; padding: .55rem 1.1rem;
+    border-radius: 8px 8px 0 0; cursor: pointer; font-size: .95rem; }
+  .tabs button.activa { background: var(--marron); color: #fff; border-color: var(--marron); }
+
+  section.tab { display: none; }
+  section.tab.activa { display: block; }
+
+  .panel { background: #fff; border: 1px solid var(--borde); border-radius: 8px;
+    padding: 1rem; margin-bottom: 1rem; }
+  .panel h2 { margin: 0 0 .8rem; font-size: 1.02rem; color: var(--marron); }
+
+  table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  th, td { text-align: left; padding: .45rem .5rem; border-bottom: 1px solid var(--borde); }
+  th { background: #f3ece4; color: var(--marron); font-weight: 600; }
+  tr.formato td { background: #fdfbf8; }
+  tr.formato td:first-child { padding-left: 1.6rem; }
+
+  .badge { display: inline-block; padding: .1rem .5rem; border-radius: 10px;
+    font-size: .75rem; font-weight: 600; }
+  .badge.si { background: #e8f5e9; color: var(--ok); }
+  .badge.no { background: #fbe9e7; color: var(--err); }
+  .badge.NUEVO { background: #e8f5e9; color: var(--ok); }
+  .badge.ACTUALIZAR { background: #fff3e0; color: var(--warn); }
+  .badge.SIN_CAMBIOS { background: #eeeeee; color: var(--gris); }
+  .badge.ERROR { background: #fbe9e7; color: var(--err); }
+  .badge.OMITIDO_POR_MODO { background: #ede7f6; color: #5e35b1; }
+
+  button.accion { border: 1px solid var(--borde); background: #fff; border-radius: 6px;
+    padding: .3rem .7rem; cursor: pointer; font-size: .82rem; margin: 0 .15rem .15rem 0; }
+  button.accion:hover { background: #f3ece4; }
+  button.primario { background: var(--marron); color: #fff; border: none; border-radius: 6px;
+    padding: .55rem 1.2rem; cursor: pointer; font-size: .92rem; }
+  button.primario:disabled { background: #bbb; cursor: not-allowed; }
+
+  form.editor { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: .7rem; align-items: end; }
+  form.editor label { display: flex; flex-direction: column; font-size: .82rem;
+    color: var(--marron-claro); gap: .25rem; }
+  form.editor input, form.editor select { padding: .45rem; border: 1px solid var(--borde);
+    border-radius: 6px; font-size: .9rem; }
+
+  textarea { width: 100%; min-height: 130px; border: 1px solid var(--borde);
+    border-radius: 6px; padding: .5rem; font-family: monospace; font-size: .82rem; }
+
+  #aviso { position: fixed; top: .8rem; right: .8rem; max-width: 380px; z-index: 10;
+    padding: .7rem 1rem; border-radius: 8px; font-size: .9rem; display: none;
+    box-shadow: 0 2px 10px rgba(0,0,0,.25); white-space: pre-wrap; }
+  #aviso.ok { background: #e8f5e9; color: var(--ok); border: 1px solid var(--ok); }
+  #aviso.err { background: #fbe9e7; color: var(--err); border: 1px solid var(--err); }
+
+  .resumen-import { display: flex; gap: .8rem; flex-wrap: wrap; margin: .8rem 0; }
+  .resumen-import div { background: #f3ece4; border-radius: 8px; padding: .5rem .9rem;
+    font-size: .85rem; text-align: center; }
+  .resumen-import strong { display: block; font-size: 1.25rem; color: var(--marron); }
+
+  .muted { color: var(--gris); font-size: .85rem; }
+  ul.instrucciones { font-size: .85rem; color: #444; padding-left: 1.2rem; }
+  ul.instrucciones li { margin-bottom: .25rem; }
+  .cargando { opacity: .5; pointer-events: none; }
+</style>
+</head>
+<body>
+<header><h1>🍫 Sistema Bodega — Administración del catálogo</h1></header>
+<div id="aviso"></div>
+
+<main>
+  <div class="tabs">
+    <button id="tabbtn-catalogo" class="activa" onclick="mostrarTab('catalogo')">Catálogo</button>
+    <button id="tabbtn-importar" onclick="mostrarTab('importar')">Importar / Exportar</button>
+    <button id="tabbtn-historial" onclick="mostrarTab('historial')">Historial</button>
+  </div>
+
+  <!-- ============================ CATÁLOGO ============================ -->
+  <section id="tab-catalogo" class="tab activa">
+    <div class="panel" id="panel-editor" style="display:none">
+      <h2 id="editor-titulo"></h2>
+      <form class="editor" id="form-editor" onsubmit="return guardarEditor(event)">
+        <input type="hidden" id="ed-modo">
+        <input type="hidden" id="ed-id">
+        <div id="campos-producto" style="display:none;grid-column:1/-1">
+          <div class="editor" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.7rem">
+            <label>Nombre *<input id="ed-nombre" required></label>
+            <label>Código de producto<input id="ed-codigo-producto"></label>
+            <label>Categoría<input id="ed-categoria"></label>
+            <label>Descripción<input id="ed-descripcion"></label>
+          </div>
+        </div>
+        <div id="campos-formato" style="display:none;grid-column:1/-1">
+          <div class="editor" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:.7rem">
+            <label>Código de barras *<input id="ed-codigo-barras" required></label>
+            <label>Nombre del formato *<input id="ed-nombre-formato" required placeholder="p. ej. Display 15"></label>
+            <label>Tipo *
+              <select id="ed-tipo-empaque">
+                <option>DISPLAY</option><option>CAJA</option>
+                <option>UNIDAD</option><option>OTRO</option>
+              </select>
+            </label>
+            <label>Unidades por empaque *<input id="ed-unidades" type="number" min="1" required></label>
+          </div>
+        </div>
+        <div style="grid-column:1/-1">
+          <button type="submit" class="primario">Guardar</button>
+          <button type="button" class="accion" onclick="cerrarEditor()">Cancelar</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="panel">
+      <h2>Productos y formatos
+        <button class="accion" style="float:right" onclick="abrirEditorProducto(null)">+ Nuevo producto</button>
+      </h2>
+      <input id="buscador" placeholder="Buscar por nombre, categoría o código de barras…"
+        style="width:100%;padding:.5rem;border:1px solid var(--borde);border-radius:6px;margin-bottom:.7rem"
+        oninput="renderCatalogo()">
+      <div id="lista-catalogo"><p class="muted">Cargando…</p></div>
+    </div>
+  </section>
+
+  <!-- ========================= IMPORTAR/EXPORTAR ========================= -->
+  <section id="tab-importar" class="tab">
+    <div class="panel">
+      <h2>Plantilla y exportación</h2>
+      <button class="accion" onclick="descargarPlantilla()">⬇ Descargar plantilla</button>
+      <button class="accion" onclick="exportarCatalogo()">⬇ Exportar catálogo actual</button>
+      <ul class="instrucciones" id="instrucciones"></ul>
+    </div>
+
+    <div class="panel">
+      <h2>Cargar planilla (CSV)</h2>
+      <p class="muted">Selecciona un archivo o pega el contenido. Nada se importa sin previsualizar y confirmar.</p>
+      <input type="file" id="archivo-csv" accept=".csv,text/csv" onchange="leerArchivo(this)">
+      <p class="muted" style="margin:.5rem 0 .2rem">…o pega el contenido CSV:</p>
+      <textarea id="texto-csv" placeholder="codigo_producto,nombre_producto,categoria,codigo_barras,..."></textarea>
+      <div style="margin-top:.7rem">
+        <label style="font-size:.85rem">Modo:
+          <select id="modo-import">
+            <option value="AGREGAR_Y_ACTUALIZAR">Agregar y actualizar</option>
+            <option value="AGREGAR">Solo agregar nuevos</option>
+            <option value="ACTUALIZAR">Solo actualizar existentes</option>
+          </select>
+        </label>
+        <button class="primario" style="margin-left:.6rem" onclick="previsualizar()">Previsualizar</button>
+        <button class="primario" id="btn-confirmar" disabled onclick="confirmarImportacion()">Confirmar importación</button>
+      </div>
+      <div id="resultado-preview"></div>
+    </div>
+  </section>
+
+  <!-- ============================ HISTORIAL ============================ -->
+  <section id="tab-historial" class="tab">
+    <div class="panel">
+      <h2>Cambios del catálogo</h2>
+      <div id="lista-historial"><p class="muted">Cargando…</p></div>
+    </div>
+    <div class="panel">
+      <h2>Importaciones realizadas</h2>
+      <div id="lista-importaciones"><p class="muted">Cargando…</p></div>
+    </div>
+  </section>
+</main>
+
+<script>
+var catalogo = [];
+var csvPrevisualizado = null;
+
+// ------------------------------ utilitarios ------------------------------
+function esc(s) {
+  return String(s === null || s === undefined ? '' : s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+function aviso(mensaje, tipo) {
+  var el = document.getElementById('aviso');
+  el.textContent = mensaje;
+  el.className = tipo || 'ok';
+  el.style.display = 'block';
+  clearTimeout(el._t);
+  el._t = setTimeout(function () { el.style.display = 'none'; }, 6000);
+}
+function llamar(fn, args, onOk) {
+  document.body.classList.add('cargando');
+  google.script.run
+    .withSuccessHandler(function (r) {
+      document.body.classList.remove('cargando');
+      onOk(r);
+    })
+    .withFailureHandler(function (err) {
+      document.body.classList.remove('cargando');
+      aviso(err.message || String(err), 'err');
+    })[fn].apply(null, args || []);
+}
+function descargar(nombre, contenido) {
+  var blob = new Blob([contenido], { type: 'text/csv;charset=utf-8' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = nombre;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+function mostrarTab(nombre) {
+  ['catalogo', 'importar', 'historial'].forEach(function (t) {
+    document.getElementById('tab-' + t).classList.toggle('activa', t === nombre);
+    document.getElementById('tabbtn-' + t).classList.toggle('activa', t === nombre);
+  });
+  if (nombre === 'historial') cargarHistorial();
+}
+
+// ------------------------------- catálogo --------------------------------
+function cargarCatalogo() {
+  llamar('catalogoListar', [], function (r) {
+    catalogo = r || [];
+    renderCatalogo();
+  });
+}
+function renderCatalogo() {
+  var filtro = document.getElementById('buscador').value.toLowerCase();
+  var cont = document.getElementById('lista-catalogo');
+  if (catalogo.length === 0) {
+    cont.innerHTML = '<p class="muted">El catálogo está vacío. Crea un producto ' +
+      'manualmente o importa una planilla desde la pestaña "Importar / Exportar".</p>';
+    return;
+  }
+  var visibles = catalogo.filter(function (p) {
+    if (!filtro) return true;
+    var texto = (p.nombre + ' ' + p.categoria + ' ' + p.codigo_producto + ' ' +
+      p.formatos.map(function (f) { return f.codigo_barras; }).join(' ')).toLowerCase();
+    return texto.indexOf(filtro) !== -1;
+  });
+  var html = '<table><tr><th>Producto / Formato</th><th>Código</th><th>Tipo</th>' +
+    '<th>Unid./empaque</th><th>Stock (unid.)</th><th>Estado</th><th>Acciones</th></tr>';
+  visibles.forEach(function (p) {
+    html += '<tr><td><strong>' + esc(p.nombre) + '</strong>' +
+      (p.categoria ? ' <span class="muted">· ' + esc(p.categoria) + '</span>' : '') +
+      '</td><td>' + esc(p.codigo_producto || p.producto_id) + '</td><td></td><td></td>' +
+      '<td>' + p.stock_unidades + '</td>' +
+      '<td><span class="badge ' + (p.activo === 'SI' ? 'si' : 'no') + '">' + esc(p.activo) + '</span></td>' +
+      '<td>' +
+      '<button class="accion" onclick="abrirEditorProducto(\'' + esc(p.producto_id) + '\')">Editar</button>' +
+      '<button class="accion" onclick="abrirEditorFormato(null,\'' + esc(p.producto_id) + '\')">+ Formato</button>' +
+      '<button class="accion" onclick="cambiarEstado(\'PRODUCTO\',\'' + esc(p.producto_id) + '\',' +
+        (p.activo !== 'SI') + ',false)">' + (p.activo === 'SI' ? 'Desactivar' : 'Activar') + '</button>' +
+      '</td></tr>';
+    p.formatos.forEach(function (f) {
+      html += '<tr class="formato"><td>' + esc(f.nombre_formato) + '</td>' +
+        '<td>' + esc(f.codigo_barras) + '</td>' +
+        '<td>' + esc(f.tipo_empaque) + '</td>' +
+        '<td>' + esc(f.unidades_por_empaque) + '</td><td></td>' +
+        '<td><span class="badge ' + (f.activo === 'SI' ? 'si' : 'no') + '">' + esc(f.activo) + '</span></td>' +
+        '<td>' +
+        '<button class="accion" onclick="abrirEditorFormato(\'' + esc(f.formato_id) + '\',\'' +
+          esc(f.producto_id) + '\')">Editar</button>' +
+        '<button class="accion" onclick="cambiarEstado(\'FORMATO\',\'' + esc(f.formato_id) + '\',' +
+          (f.activo !== 'SI') + ',false)">' + (f.activo === 'SI' ? 'Desactivar' : 'Activar') + '</button>' +
+        '</td></tr>';
+    });
+  });
+  html += '</table>';
+  if (visibles.length === 0) html = '<p class="muted">Sin resultados para la búsqueda.</p>';
+  cont.innerHTML = html;
+}
+
+function abrirEditorProducto(productoId) {
+  var p = productoId ? catalogo.filter(function (x) { return x.producto_id === productoId; })[0] : null;
+  document.getElementById('ed-modo').value = p ? 'editar-producto' : 'crear-producto';
+  document.getElementById('ed-id').value = p ? p.producto_id : '';
+  document.getElementById('editor-titulo').textContent =
+    p ? 'Editar producto: ' + p.nombre : 'Nuevo producto';
+  document.getElementById('campos-producto').style.display = '';
+  document.getElementById('campos-formato').style.display = 'none';
+  document.getElementById('ed-nombre').value = p ? p.nombre : '';
+  document.getElementById('ed-codigo-producto').value = p ? p.codigo_producto : '';
+  document.getElementById('ed-categoria').value = p ? p.categoria : '';
+  document.getElementById('ed-descripcion').value = p ? p.descripcion : '';
+  document.getElementById('ed-nombre').required = true;
+  document.getElementById('ed-codigo-barras').required = false;
+  document.getElementById('ed-nombre-formato').required = false;
+  document.getElementById('ed-unidades').required = false;
+  document.getElementById('panel-editor').style.display = '';
+  document.getElementById('ed-nombre').focus();
+}
+function abrirEditorFormato(formatoId, productoId) {
+  var p = catalogo.filter(function (x) { return x.producto_id === productoId; })[0];
+  var f = null;
+  if (formatoId && p) {
+    f = p.formatos.filter(function (x) { return x.formato_id === formatoId; })[0];
+  }
+  document.getElementById('ed-modo').value = f ? 'editar-formato' : 'crear-formato';
+  document.getElementById('ed-id').value = f ? f.formato_id : productoId;
+  document.getElementById('editor-titulo').textContent = f
+    ? 'Editar formato de ' + (p ? p.nombre : '') + ': ' + f.nombre_formato
+    : 'Nuevo formato para: ' + (p ? p.nombre : '');
+  document.getElementById('campos-producto').style.display = 'none';
+  document.getElementById('campos-formato').style.display = '';
+  document.getElementById('ed-codigo-barras').value = f ? f.codigo_barras : '';
+  document.getElementById('ed-nombre-formato').value = f ? f.nombre_formato : '';
+  document.getElementById('ed-tipo-empaque').value = f ? f.tipo_empaque : 'DISPLAY';
+  document.getElementById('ed-unidades').value = f ? f.unidades_por_empaque : '';
+  document.getElementById('ed-nombre').required = false;
+  document.getElementById('ed-codigo-barras').required = true;
+  document.getElementById('ed-nombre-formato').required = true;
+  document.getElementById('ed-unidades').required = true;
+  document.getElementById('panel-editor').style.display = '';
+  document.getElementById('ed-codigo-barras').focus();
+}
+function cerrarEditor() {
+  document.getElementById('panel-editor').style.display = 'none';
+}
+function guardarEditor(ev) {
+  ev.preventDefault();
+  var modo = document.getElementById('ed-modo').value;
+  var id = document.getElementById('ed-id').value;
+  var listo = function () {
+    cerrarEditor();
+    aviso('Guardado correctamente.', 'ok');
+    cargarCatalogo();
+  };
+  if (modo === 'crear-producto' || modo === 'editar-producto') {
+    var datosP = {
+      nombre: document.getElementById('ed-nombre').value,
+      codigo_producto: document.getElementById('ed-codigo-producto').value,
+      categoria: document.getElementById('ed-categoria').value,
+      descripcion: document.getElementById('ed-descripcion').value
+    };
+    if (modo === 'crear-producto') llamar('catalogoCrearProducto', [datosP], listo);
+    else llamar('catalogoEditarProducto', [id, datosP], listo);
+  } else {
+    var datosF = {
+      producto_id: modo === 'crear-formato' ? id : undefined,
+      codigo_barras: document.getElementById('ed-codigo-barras').value,
+      nombre_formato: document.getElementById('ed-nombre-formato').value,
+      tipo_empaque: document.getElementById('ed-tipo-empaque').value,
+      unidades_por_empaque: document.getElementById('ed-unidades').value
+    };
+    if (modo === 'crear-formato') llamar('catalogoCrearFormato', [datosF], listo);
+    else llamar('catalogoEditarFormato', [id, datosF], listo);
+  }
+  return false;
+}
+function cambiarEstado(entidad, id, activar, forzar) {
+  llamar('catalogoCambiarEstado', [entidad, id, activar, forzar], function (r) {
+    if (r && r.requiereConfirmacion) {
+      if (confirm(r.advertencia + '\n\n¿Continuar?')) {
+        cambiarEstado(entidad, id, activar, true);
+      }
+      return;
+    }
+    aviso('Estado actualizado.', 'ok');
+    cargarCatalogo();
+  });
+}
+
+// ---------------------------- importar/exportar ---------------------------
+function descargarPlantilla() {
+  llamar('importacionPlantillaCsv', [], function (csv) {
+    descargar('plantilla_catalogo.csv', csv);
+  });
+}
+function exportarCatalogo() {
+  llamar('catalogoExportarCsv', [], function (csv) {
+    descargar('catalogo_exportado.csv', csv);
+  });
+}
+function leerArchivo(input) {
+  var archivo = input.files && input.files[0];
+  if (!archivo) return;
+  var lector = new FileReader();
+  lector.onload = function () {
+    document.getElementById('texto-csv').value = lector.result;
+    aviso('Archivo "' + archivo.name + '" cargado. Ahora previsualiza.', 'ok');
+  };
+  lector.readAsText(archivo, 'utf-8');
+}
+function previsualizar() {
+  var csv = document.getElementById('texto-csv').value;
+  if (!csv.trim()) { aviso('No hay contenido CSV para previsualizar.', 'err'); return; }
+  var modo = document.getElementById('modo-import').value;
+  llamar('importacionPrevisualizar', [csv, modo], function (r) {
+    csvPrevisualizado = null;
+    var cont = document.getElementById('resultado-preview');
+    if (!r.ok) {
+      cont.innerHTML = '<p style="color:var(--err)">' + esc(r.erroresGlobales.join(' ')) + '</p>';
+      document.getElementById('btn-confirmar').disabled = true;
+      return;
+    }
+    csvPrevisualizado = csv;
+    var res = r.resumen;
+    var html = '<div class="resumen-import">' +
+      '<div><strong>' + res.total + '</strong>filas</div>' +
+      '<div><strong>' + res.NUEVO + '</strong>nuevos</div>' +
+      '<div><strong>' + res.ACTUALIZAR + '</strong>a actualizar</div>' +
+      '<div><strong>' + res.SIN_CAMBIOS + '</strong>sin cambios</div>' +
+      '<div><strong>' + res.OMITIDO_POR_MODO + '</strong>omitidos por modo</div>' +
+      '<div><strong>' + res.ERROR + '</strong>con error</div></div>';
+    html += '<table><tr><th>Fila</th><th>Resultado</th><th>Producto</th>' +
+      '<th>Formato</th><th>Código</th><th>Detalle</th></tr>';
+    r.filas.forEach(function (f) {
+      var detalle = '';
+      if (f.errores.length) {
+        detalle = '<span style="color:var(--err)">' + esc(f.errores.join(' ')) + '</span>';
+      } else if (f.cambios.length) {
+        detalle = f.cambios.map(function (c) {
+          return esc(c.campo) + ': ' + esc(c.anterior) + ' → ' + esc(c.nuevo);
+        }).join('<br>');
+      }
+      html += '<tr><td>' + f.fila + '</td>' +
+        '<td><span class="badge ' + esc(f.estado) + '">' + esc(f.estado) + '</span></td>' +
+        '<td>' + esc(f.datos.nombre_producto) + '</td>' +
+        '<td>' + esc(f.datos.nombre_formato) + '</td>' +
+        '<td>' + esc(f.datos.codigo_barras) + '</td>' +
+        '<td>' + detalle + '</td></tr>';
+    });
+    html += '</table>';
+    cont.innerHTML = html;
+    var aplicables = res.NUEVO + res.ACTUALIZAR;
+    document.getElementById('btn-confirmar').disabled = aplicables === 0;
+    if (aplicables === 0) {
+      aviso('Nada que aplicar: no hay filas nuevas ni actualizaciones.', 'err');
+    }
+  });
+}
+function confirmarImportacion() {
+  if (!csvPrevisualizado) { aviso('Primero previsualiza la planilla.', 'err'); return; }
+  var modo = document.getElementById('modo-import').value;
+  var input = document.getElementById('archivo-csv');
+  var nombre = (input.files && input.files[0] && input.files[0].name) || 'pegado manual';
+  document.getElementById('btn-confirmar').disabled = true;
+  llamar('importacionAplicar', [csvPrevisualizado, modo, nombre], function (r) {
+    var d = r.detalle;
+    aviso('IMPORTACIÓN COMPLETADA (' + r.importacion_id + ')\n' +
+      'Productos creados: ' + d.productosCreados +
+      ' · actualizados: ' + d.productosActualizados + '\n' +
+      'Formatos creados: ' + d.formatosCreados +
+      ' · actualizados: ' + d.formatosActualizados +
+      (r.filasConError.length ? '\nFilas omitidas por error: ' + r.filasConError.length : ''),
+      'ok');
+    csvPrevisualizado = null;
+    document.getElementById('resultado-preview').innerHTML = '';
+    document.getElementById('texto-csv').value = '';
+    document.getElementById('archivo-csv').value = '';
+    cargarCatalogo();
+  });
+}
+
+// ------------------------------- historial --------------------------------
+function cargarHistorial() {
+  llamar('histListar', [100], function (rows) {
+    var html = '<table><tr><th>Fecha</th><th>Usuario</th><th>Entidad</th>' +
+      '<th>Campo</th><th>Cambio</th><th>Origen</th></tr>';
+    (rows || []).forEach(function (h) {
+      html += '<tr><td>' + esc(h.fecha_hora) + '</td><td>' + esc(h.usuario_id) + '</td>' +
+        '<td>' + esc(h.entidad) + ' ' + esc(h.entidad_id) + '</td>' +
+        '<td>' + esc(h.campo) + '</td>' +
+        '<td>' + esc(h.valor_anterior) + ' → ' + esc(h.valor_nuevo) + '</td>' +
+        '<td>' + esc(h.origen) + '</td></tr>';
+    });
+    html += '</table>';
+    document.getElementById('lista-historial').innerHTML =
+      rows && rows.length ? html : '<p class="muted">Sin cambios registrados.</p>';
+  });
+  llamar('importacionListar', [20], function (rows) {
+    var html = '<table><tr><th>ID</th><th>Fecha</th><th>Archivo</th><th>Filas</th>' +
+      '<th>Creados</th><th>Actualizados</th><th>Sin cambios</th><th>Errores</th></tr>';
+    (rows || []).forEach(function (i) {
+      html += '<tr><td>' + esc(i.importacion_id) + '</td><td>' + esc(i.fecha_hora) + '</td>' +
+        '<td>' + esc(i.nombre_archivo) + '</td><td>' + esc(i.cantidad_filas) + '</td>' +
+        '<td>' + esc(i.creados) + '</td><td>' + esc(i.actualizados) + '</td>' +
+        '<td>' + esc(i.sin_cambios) + '</td><td>' + esc(i.errores) + '</td></tr>';
+    });
+    html += '</table>';
+    document.getElementById('lista-importaciones').innerHTML =
+      rows && rows.length ? html : '<p class="muted">Sin importaciones registradas.</p>';
+  });
+}
+
+// -------------------------------- arranque --------------------------------
+cargarCatalogo();
+llamar('importacionInstrucciones', [], function (lista) {
+  document.getElementById('instrucciones').innerHTML =
+    (lista || []).map(function (i) { return '<li>' + esc(i) + '</li>'; }).join('');
+});
+</script>
+</body>
+</html>

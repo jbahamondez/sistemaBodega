@@ -41,6 +41,8 @@ const projectGlobals = {
   utilHashPin: 'readonly',
   utilSafeEquals: 'readonly',
   utilPadNumber: 'readonly',
+  utilParseCsv: 'readonly',
+  utilToCsv: 'readonly',
   // Validation.gs
   valRequireNonEmpty: 'readonly',
   valRequirePositiveInt: 'readonly',
@@ -66,6 +68,33 @@ const projectGlobals = {
   // Ids.gs
   idNext: 'readonly',
   idNextBatch: 'readonly',
+  // Historial.gs
+  histRegistrar: 'readonly',
+  histRegistrarCambios: 'readonly',
+  histListar: 'readonly',
+  // Catalogo.gs
+  catalogoListar: 'readonly',
+  catalogoCrearProducto: 'readonly',
+  catalogoEditarProducto: 'readonly',
+  catalogoCrearFormato: 'readonly',
+  catalogoEditarFormato: 'readonly',
+  catalogoCambiarEstado: 'readonly',
+  catalogoAdvertenciaDesactivacion_: 'readonly',
+  catalogoValidarCodigoBarrasUnico_: 'readonly',
+  catalogoBuscarPorCodigoBarras: 'readonly',
+  catalogoExportarCsv: 'readonly',
+  // Importacion.gs
+  importacionPlantillaCsv: 'readonly',
+  importacionInstrucciones: 'readonly',
+  importacionPrevisualizar: 'readonly',
+  importacionAplicar: 'readonly',
+  importacionListar: 'readonly',
+  importacionLeerFila_: 'readonly',
+  importacionValidarFila_: 'readonly',
+  importacionDetectarCambios_: 'readonly',
+  importacionAplicarNuevo_: 'readonly',
+  importacionAplicarActualizacion_: 'readonly',
+  importacionResultadoVacio_: 'readonly',
   // SelfTest.gs
   assert_: 'readonly'
 };

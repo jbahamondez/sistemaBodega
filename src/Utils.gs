@@ -83,3 +83,65 @@ function utilPadNumber(n, padding) {
   while (s.length < padding) s = '0' + s;
   return s;
 }
+
+/**
+ * Parsea texto CSV respetando comillas dobles (campos con delimitador o
+ * saltos de línea internos). Detecta automáticamente el delimitador (',' o
+ * ';' — Excel en español exporta con ';'). Elimina BOM y filas vacías.
+ * Devuelve { delimiter, rows } donde rows es una matriz de strings.
+ */
+function utilParseCsv(text) {
+  var BOM = String.fromCharCode(0xFEFF);
+  text = String(text || '');
+  if (text.charAt(0) === BOM) text = text.slice(1);
+  var firstLine = text.split(/\r?\n/, 1)[0] || '';
+  var delimiter = firstLine.split(';').length > firstLine.split(',').length ? ';' : ',';
+
+  var rows = [];
+  var row = [];
+  var field = '';
+  var inQuotes = false;
+
+  for (var i = 0; i < text.length; i++) {
+    var c = text.charAt(i);
+    if (inQuotes) {
+      if (c === '"') {
+        if (text.charAt(i + 1) === '"') { field += '"'; i++; }
+        else inQuotes = false;
+      } else {
+        field += c;
+      }
+    } else if (c === '"') {
+      inQuotes = true;
+    } else if (c === delimiter) {
+      row.push(field); field = '';
+    } else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text.charAt(i + 1) === '\n') i++;
+      row.push(field); field = '';
+      rows.push(row); row = [];
+    } else {
+      field += c;
+    }
+  }
+  if (field !== '' || row.length > 0) { row.push(field); rows.push(row); }
+
+  rows = rows.filter(function (r) {
+    return r.some(function (v) { return utilTrim(v) !== ''; });
+  });
+  return { delimiter: delimiter, rows: rows };
+}
+
+/**
+ * Genera texto CSV a partir de una matriz de valores. Usa coma, CRLF y BOM
+ * inicial para que Excel lo abra correctamente con acentos.
+ */
+function utilToCsv(rows) {
+  var lines = rows.map(function (row) {
+    return row.map(function (value) {
+      var s = value === null || value === undefined ? '' : String(value);
+      if (/[",\r\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+      return s;
+    }).join(',');
+  });
+  return String.fromCharCode(0xFEFF) + lines.join('\r\n') + '\r\n';
+}

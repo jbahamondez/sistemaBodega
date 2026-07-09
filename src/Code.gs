@@ -7,6 +7,13 @@
  */
 
 function doGet(e) {
+  var page = e && e.parameter && e.parameter.page;
+  if (page === 'catalogo') {
+    return HtmlService.createHtmlOutputFromFile('CatalogoUi')
+      .setTitle('Catálogo — Sistema Bodega')
+      .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+  }
+
   var estado = codeEstadoFundacion_();
   var html = HtmlService.createHtmlOutput(
     '<!DOCTYPE html><html><head><meta charset="utf-8">' +
@@ -20,6 +27,7 @@ function doGet(e) {
     '<li>Hojas del modelo: ' + estado.hojasExistentes + ' de ' + estado.hojasEsperadas + '</li>' +
     '<li>Usuarios registrados: ' + estado.usuarios + '</li>' +
     '</ul>' +
+    '<p><a href="?page=catalogo">→ Administración del catálogo</a></p>' +
     '<p>Las pantallas de ingreso, retiro y consulta se habilitan en las próximas fases.</p>' +
     '</body></html>'
   );

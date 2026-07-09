@@ -155,6 +155,55 @@ var CONFIG = {
     HISTORIAL:   { prefix: 'HIST', counterKey: 'contador_historial',   padding: 6 }
   },
 
+  /**
+   * Mapeo de la planilla de carga masiva del catálogo.
+   *
+   * ÚNICO punto que define qué columnas tiene la planilla y a qué campo del
+   * sistema corresponde cada una. La planilla definitiva de la chocolatería
+   * aún no existe: cuando exista, ajustar solo esta lista (encabezados,
+   * obligatoriedad) sin tocar la lógica de importación.
+   */
+  IMPORT_PLANILLA: {
+    columns: [
+      { header: 'codigo_producto',      required: false },
+      { header: 'nombre_producto',      required: true },
+      { header: 'categoria',            required: false },
+      { header: 'codigo_barras',        required: true },
+      { header: 'nombre_formato',       required: true },
+      { header: 'tipo_empaque',         required: true },
+      { header: 'unidades_por_empaque', required: true },
+      { header: 'activo',               required: false }
+    ],
+    exampleRows: [
+      ['PROD-EJ1', 'Chocolate Bitter', 'Chocolates', '780123456789', 'Display 15', 'DISPLAY', '15', 'SI'],
+      ['PROD-EJ1', 'Chocolate Bitter', 'Chocolates', '780987654321', 'Caja 90', 'CAJA', '90', 'SI'],
+      ['PROD-EJ2', 'Bombon Almendra', 'Bombones', '780333333333', 'Caja 24', 'CAJA', '24', 'SI']
+    ]
+  },
+
+  /** Modos de importación del catálogo. */
+  MODOS_IMPORTACION: {
+    AGREGAR: 'AGREGAR',
+    ACTUALIZAR: 'ACTUALIZAR',
+    AGREGAR_Y_ACTUALIZAR: 'AGREGAR_Y_ACTUALIZAR'
+  },
+
+  /** Clasificación de filas en la previsualización de importación. */
+  ESTADOS_FILA_IMPORT: {
+    NUEVO: 'NUEVO',
+    ACTUALIZAR: 'ACTUALIZAR',
+    SIN_CAMBIOS: 'SIN_CAMBIOS',
+    ERROR: 'ERROR',
+    OMITIDO_POR_MODO: 'OMITIDO_POR_MODO'
+  },
+
+  /**
+   * Identificador de usuario provisorio hasta implementar la autenticación
+   * (Fase 7). Las operaciones lo registran para que el dato sea honesto:
+   * indica explícitamente que aún no hay login.
+   */
+  USUARIO_PENDIENTE_AUTH: 'PENDIENTE-AUTH',
+
   /** Configuración operativa inicial sembrada en la hoja Configuracion. */
   DEFAULTS: {
     stock_minimo_default: '10',

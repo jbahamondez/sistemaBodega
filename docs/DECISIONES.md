@@ -77,3 +77,45 @@ La inicialización crea solo lo que falta y **falla explícitamente** si una
 hoja existente tiene encabezados que no coinciden con el esquema, en lugar de
 "repararla" automáticamente. Nunca borra datos (prompt §27: no sobrescribir
 una app estable).
+
+## D-011 — Usuario placeholder `PENDIENTE-AUTH` hasta Fase 7
+
+La autenticación llega en la Fase 7 (según orden del prompt §28). Mientras
+tanto, las operaciones del catálogo registran `PENDIENTE-AUTH` como usuario
+responsable: el dato es honesto (indica que no había login) y no bloquea el
+desarrollo de fases previas. Las firmas ya aceptan `usuarioId`, por lo que
+integrar la sesión real no requerirá cambiar la lógica.
+
+## D-012 — CSV con delimitador autodetectado y BOM
+
+Excel en español (es-CL) exporta CSV con punto y coma; otras fuentes usan
+coma. `utilParseCsv` detecta el delimitador por frecuencia en la primera
+línea, respeta comillas dobles y elimina el BOM. `utilToCsv` genera con coma,
+CRLF y BOM inicial para que Excel abra acentos correctamente. Los códigos de
+barras viajan siempre como texto (Caso 11: `001234567890` se preserva).
+
+## D-013 — Identidad de registros en la importación
+
+Según §8.7: los **formatos** se identifican por `codigo_barras` (clave
+principal de matching). Los **productos** se identifican por
+`codigo_producto` cuando existe y, como fallback, por nombre normalizado
+(minúsculas, sin espacios en los bordes). El fallback por nombre es
+inevitable mientras la planilla no traiga códigos de producto; por eso la
+plantilla y las instrucciones recomiendan usar `codigo_producto`.
+
+## D-014 — Mapeo de planilla concentrado en `CONFIG.IMPORT_PLANILLA`
+
+La planilla definitiva de la chocolatería aún no existe (confirmado por el
+usuario, 2026-07-09). Todo lo que la importación sabe de la estructura de la
+planilla (encabezados, obligatoriedad, filas de ejemplo de la plantilla) vive
+en `CONFIG.IMPORT_PLANILLA`. Cuando la planilla real se defina, el ajuste es
+solo de configuración. El parser además tolera columnas extra y en cualquier
+orden, para que un catálogo exportado y editado sea reimportable.
+
+## D-015 — Pruebas ejecutables local y remotamente
+
+`SelfTest.gs` corre en el editor de Apps Script (`runFoundationTests()`) y
+también localmente con `npm test`: `scripts/run-tests.js` carga todos los
+`.gs` en un contexto V8 compartido (igual que Apps Script) con mocks mínimos
+de `Utilities`, `PropertiesService`, `LockService` y `Logger`. Las pruebas de
+integración que requieren la BD real se omiten solas fuera de Apps Script.
