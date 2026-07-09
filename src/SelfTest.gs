@@ -167,7 +167,7 @@ function runMovimientoTests() {
 
   var resultados = [];
   var tests = [testMovimientosCasos_, testAuthYPermisos_,
-    testCorreccionCaso6_, testImportacionCasos_];
+    testCorreccionCaso6_, testImportacionCasos_, testHttpRouter_];
   tests.forEach(function (t) {
     try {
       t();
@@ -497,6 +497,47 @@ function testImportacionCasos_() {
   var prev4 = importacionPrevisualizar_(csv4, 'AGREGAR');
   assert_(prev4.resumen.OMITIDO_POR_MODO === 1,
     'modo AGREGAR omite actualizaciones');
+}
+
+/**
+ * Router HTTP (Http.gs): el frontend de GitHub Pages llama por POST/JSON.
+ * Depende del usuario 'jefa.test' creado en testAuthYPermisos_.
+ */
+function testHttpRouter_() {
+  function post(cuerpo) {
+    var r = doPost({ postData: { contents: JSON.stringify(cuerpo) } });
+    return JSON.parse(r.getContent());
+  }
+
+  // Login válido a través del router.
+  var login = post({ fn: 'apiLogin', args: ['jefa.test', '1234'] });
+  assert_(login.ok && login.data.token && login.data.rol === 'JEFATURA',
+    'router: login entrega token');
+
+  // Operación autenticada a través del router.
+  var dash = post({ fn: 'apiPanelDashboard', args: [login.data.token] });
+  assert_(dash.ok && dash.data.total_productos >= 1,
+    'router: operación autenticada funciona');
+
+  // Errores de negocio viajan como ok:false (nunca excepción sin formato).
+  var malPin = post({ fn: 'apiLogin', args: ['jefa.test', '0000'] });
+  assert_(malPin.ok === false && malPin.error.indexOf('incorrecto') !== -1,
+    'router: error de negocio devuelto como ok:false');
+
+  // Solo la whitelist es invocable: nada de funciones internas.
+  var interna = post({ fn: 'dbSetConfigValue_', args: ['x', 'y'] });
+  assert_(interna.ok === false && interna.error.indexOf('desconocida') !== -1,
+    'router: función fuera de la whitelist rechazada');
+  var setup = post({ fn: 'setupCrearUsuarioJefatura', args: ['X', 'x', '9999'] });
+  assert_(setup.ok === false, 'router: funciones de setup no expuestas');
+
+  // Petición malformada responde JSON de error, no excepción.
+  var vacia = doPost({});
+  assert_(JSON.parse(vacia.getContent()).ok === false,
+    'router: petición vacía manejada');
+  var rota = doPost({ postData: { contents: 'esto no es json' } });
+  assert_(JSON.parse(rota.getContent()).ok === false,
+    'router: JSON inválido manejado');
 }
 
 /** Integración: requiere setupDatabase() ejecutado. Se omite si no lo está. */

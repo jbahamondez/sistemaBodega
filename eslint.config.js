@@ -118,7 +118,7 @@ const projectGlobals = {
   usuarioCambiarEstado_: 'readonly',
   usuarioCambiarRol_: 'readonly',
   usuarioResetPin_: 'readonly',
-  // Api.gs (capa pública; referenciada también desde las pruebas)
+  // Api.gs (capa pública; referenciada por Http.gs y las pruebas)
   apiLogin: 'readonly',
   apiLogout: 'readonly',
   apiSesionInfo: 'readonly',
@@ -128,8 +128,31 @@ const projectGlobals = {
   apiIngresoConfirmar: 'readonly',
   apiAjusteConfirmar: 'readonly',
   apiPanelDashboard: 'readonly',
+  apiInvListar: 'readonly',
+  apiMovListar: 'readonly',
+  apiMovObtenerDetalle: 'readonly',
+  apiMovTrazabilidad: 'readonly',
+  apiCatalogoListar: 'readonly',
+  apiCatalogoCrearProducto: 'readonly',
+  apiCatalogoEditarProducto: 'readonly',
+  apiCatalogoCrearFormato: 'readonly',
+  apiCatalogoEditarFormato: 'readonly',
+  apiCatalogoCambiarEstado: 'readonly',
+  apiCatalogoExportar: 'readonly',
+  apiImportPlantilla: 'readonly',
+  apiImportInstrucciones: 'readonly',
+  apiImportPrevisualizar: 'readonly',
+  apiImportAplicar: 'readonly',
+  apiImportListar: 'readonly',
+  apiHistorialListar: 'readonly',
   apiUsuariosListar: 'readonly',
+  apiUsuarioCrear: 'readonly',
   apiUsuarioCambiarEstado: 'readonly',
+  apiUsuarioCambiarRol: 'readonly',
+  apiUsuarioResetPin: 'readonly',
+  // Http.gs
+  httpFunciones_: 'readonly',
+  doPost: 'readonly',
   // Setup.gs
   setupDatabase: 'readonly',
   setupCrearUsuarioJefatura: 'readonly',
@@ -158,6 +181,33 @@ module.exports = [
       'no-var': 'off',
       eqeqeq: ['error', 'smart'],
       'no-implicit-globals': 'off'
+    }
+  },
+  {
+    // Frontend estático servido por GitHub Pages.
+    files: ['web/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2020,
+      sourceType: 'script',
+      globals: {
+        window: 'readonly',
+        document: 'readonly',
+        localStorage: 'readonly',
+        fetch: 'readonly',
+        alert: 'readonly',
+        console: 'readonly',
+        navigator: 'readonly',
+        location: 'readonly',
+        setTimeout: 'readonly',
+        API_URL: 'readonly',
+        Sesion: 'readonly'
+      }
+    },
+    rules: {
+      'no-undef': 'error',
+      'no-unused-vars': ['error', { vars: 'local', args: 'none', caughtErrors: 'none' }],
+      'no-var': 'off',
+      eqeqeq: ['error', 'smart']
     }
   }
 ];

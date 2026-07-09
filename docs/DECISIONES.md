@@ -179,3 +179,19 @@ Jefatura no puede desactivar su propia cuenta ni cambiar su propio rol (se
 evita dejar el sistema sin administradores por accidente). Los usuarios se
 desactivan, nunca se eliminan, y el login responde "Usuario o PIN
 incorrecto" sin revelar si el identificador existe.
+
+## D-022 — Frontend en GitHub Pages + Apps Script como API JSON
+
+Confirmado en dispositivo real (2026-07-09): la cámara Android no abre
+dentro del iframe sandbox con que Apps Script sirve sus páginas (riesgo
+anticipado en D-018). Solución: el frontend completo (carpeta `web/`) se
+publica en GitHub Pages como páginas de primer nivel — ahí `getUserMedia`
+funciona — y Apps Script queda solo como API JSON (`Http.gs`): POST al
+/exec con Content-Type `text/plain` (petición "simple", sin preflight CORS,
+que Apps Script no atiende) y body `{fn, args}`. Solo la whitelist de
+`httpFunciones_()` es invocable, que es exactamente la superficie de
+`Api.gs` con su validación de token y rol. `web/comun.js` reimplementa la
+interfaz `Sesion` sobre fetch, por lo que la lógica de las páginas no
+cambió. La URL de la API vive únicamente en `web/config.js`; el backend se
+actualiza con `clasp push` + `clasp update-deployment <id>` para conservar
+la misma URL.

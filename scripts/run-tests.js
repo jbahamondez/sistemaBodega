@@ -123,6 +123,14 @@ const context = {
   },
   Logger: { log: (m) => console.log(m) },
   HtmlService: {},
+  ContentService: {
+    MimeType: { JSON: 'JSON' },
+    createTextOutput: (s) => ({
+      _contenido: s,
+      setMimeType() { return this; },
+      getContent() { return this._contenido; }
+    })
+  },
   console
 };
 vm.createContext(context);

@@ -12,10 +12,17 @@ celulares Android con cámara).
 
 | Capa | Tecnología | Rol |
 |---|---|---|
-| Interfaz | Web responsive (HtmlService) | Pantallas de jefatura (PC) y trabajador (Android) |
-| Lógica | Google Apps Script (V8) | Validaciones, conversiones, concurrencia, autorización |
+| Frontend | Web estática en GitHub Pages (carpeta `web/`) | Pantallas de jefatura (PC) y trabajador (Android) |
+| Backend | Google Apps Script (V8) como API JSON (`Http.gs`) | Validaciones, conversiones, concurrencia, autorización |
 | Datos | Google Sheets | Almacenamiento estructurado (9 hojas) |
 | Archivos | Google Drive | Alojamiento del archivo de datos y respaldos |
+
+El frontend se separó de Apps Script porque la cámara Android no funciona
+dentro de su iframe (D-022). Las páginas llaman a la API con POST JSON
+(`web/comun.js`); la URL del backend vive solo en `web/config.js`. Ciclo de
+actualización: backend con `clasp push -f` + `clasp update-deployment <id>`
+(conserva la misma URL); el frontend se publica solo con cada push a GitHub
+(workflow `pages.yml`).
 
 Reglas de arquitectura:
 
@@ -47,17 +54,22 @@ src/
   Importacion.gs    Plantilla, previsualización y aplicación de cargas masivas
   Inventario.gs     Consulta de stock (la escritura solo ocurre vía movimientos)
   Movimientos.gs    Confirmación transaccional: bloqueo → releer → validar → escribir
-  IngresoUi.html    Pantalla de ingreso para jefatura (pistola HID, PC)
-  RetiroUi.html     Pantalla de retiro para trabajador (cámara, Android)
   Panel.gs          Agregados del dashboard (totales, alertas de stock)
-  PanelUi.html      Panel de jefatura (dashboard, inventario, movimientos, trazabilidad)
-  CatalogoUi.html   Interfaz de administración del catálogo (jefatura, PC)
   Auth.gs           Login por identificador + PIN y sesiones por token
   Usuarios.gs       Administración de usuarios (crear, estados, rol, reset PIN)
-  Api.gs            ÚNICA capa invocable desde el cliente; valida rol por operación
-  SesionParcial.html Login compartido insertado en todas las páginas
-  Code.gs           Punto de entrada web (doGet + routing con plantillas)
+  Api.gs            ÚNICA capa de negocio invocable; valida rol por operación
+  Http.gs           Router HTTP: POST JSON desde el frontend (whitelist = Api.gs)
+  Code.gs           doGet: página de estado del backend
   SelfTest.gs       Pruebas (ejecutables en el editor y localmente con npm test)
+
+web/                Frontend estático (GitHub Pages)
+  config.js         URL de la API (único punto a ajustar si cambia)
+  comun.js          Sesión (login por PIN, token) y comunicación fetch con la API
+  index.html        Inicio con accesos según rol
+  ingreso.html      Ingreso con pistola (jefatura, PC)
+  retiro.html       Retiro con cámara (trabajador, Android)
+  panel.html        Panel de jefatura
+  catalogo.html     Administración del catálogo
 ```
 
 **Seguridad (Fase 7):** la lógica de negocio usa funciones con sufijo `_`,

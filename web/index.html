@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sistema Bodega — Chocolatería</title>
+<style>
+  :root { --marron: #4e342e; --crema: #faf6f1; --borde: #e0d7ce; --gris: #757575; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; margin: 0; background: var(--crema);
+    color: #2b2b2b; }
+  header { background: var(--marron); color: #fff; padding: .9rem 1.2rem; }
+  header h1 { margin: 0; font-size: 1.15rem; font-weight: 600; }
+  main { max-width: 560px; margin: 0 auto; padding: 1.5rem 1.2rem 3rem; }
+  a.tarjeta { display: block; background: #fff; border: 1px solid var(--borde);
+    border-radius: 12px; padding: 1.1rem 1.2rem; margin-bottom: .9rem;
+    text-decoration: none; color: #2b2b2b; }
+  a.tarjeta:hover { border-color: var(--marron); }
+  a.tarjeta strong { display: block; color: var(--marron); font-size: 1.05rem;
+    margin-bottom: .2rem; }
+  a.tarjeta span { font-size: .85rem; color: var(--gris); }
+  .solo-jefatura { display: none; }
+  .muted { color: var(--gris); font-size: .85rem; }
+</style>
+</head>
+<body>
+<header><h1>🍫 Sistema de Control y Trazabilidad de Bodega</h1></header>
+<main>
+  <p id="saludo" class="muted">Cargando…</p>
+
+  <a class="tarjeta" href="retiro.html">
+    <strong>📷 Registrar retiro</strong>
+    <span>Escanear cajas o displays con la cámara para reponer la tienda</span>
+  </a>
+  <a class="tarjeta solo-jefatura" href="ingreso.html">
+    <strong>📦 Ingreso de mercadería</strong>
+    <span>Registrar entradas con la pistola escaneadora (PC)</span>
+  </a>
+  <a class="tarjeta solo-jefatura" href="panel.html">
+    <strong>📊 Panel de jefatura</strong>
+    <span>Dashboard, inventario, movimientos, trazabilidad y usuarios</span>
+  </a>
+  <a class="tarjeta solo-jefatura" href="catalogo.html">
+    <strong>🗂 Catálogo</strong>
+    <span>Productos, formatos, importación y exportación</span>
+  </a>
+</main>
+
+<script src="config.js"></script>
+<script src="comun.js"></script>
+<script>
+// Cualquier rol puede entrar al inicio; las tarjetas administrativas solo se
+// muestran a jefatura (la barrera real está en el servidor).
+Sesion.asegurar(null, function (sesion) {
+  document.getElementById('saludo').textContent =
+    'Hola, ' + sesion.nombre + '. ¿Qué necesitas hacer?';
+  if (sesion.rol === 'JEFATURA') {
+    document.querySelectorAll('.solo-jefatura').forEach(function (el) {
+      el.style.display = 'block';
+    });
+  }
+});
+</script>
+</body>
+</html>
