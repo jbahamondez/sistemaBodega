@@ -132,6 +132,7 @@ const projectGlobals = {
   apiUsuarioCambiarEstado: 'readonly',
   // Setup.gs
   setupDatabase: 'readonly',
+  setupCrearUsuarioJefatura: 'readonly',
   // SelfTest.gs
   assert_: 'readonly',
   runMovimientoTests: 'readonly'

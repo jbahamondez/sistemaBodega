@@ -117,6 +117,20 @@ function setupSeedConfig_() {
  * El PIN se almacena solo como hash con salt; el original no queda guardado.
  */
 function setupCrearUsuarioJefatura(nombre, identificadorAcceso, pin) {
+  // GUARDIA DE SEGURIDAD: esta función no termina en "_" para poder
+  // ejecutarse desde el editor, lo que también la deja invocable vía
+  // google.script.run. Solo funciona como bootstrap: si ya existe un
+  // usuario JEFATURA activo, se niega — los demás usuarios se crean desde
+  // el panel con sesión validada (Api.gs).
+  var yaHayJefatura = dbFindOne_('USUARIOS', function (u) {
+    return u.rol === CONFIG.ROLES.JEFATURA && utilToBool(u.activo);
+  });
+  if (yaHayJefatura) {
+    throw new Error(
+      'Ya existe un usuario de jefatura activo. Crea los demás usuarios ' +
+      'desde el panel (pestaña Usuarios), con sesión iniciada.');
+  }
+
   // Valores de ejemplo para ejecución directa desde el editor:
   nombre = nombre || 'Jefatura';
   identificadorAcceso = utilTrim(identificadorAcceso || 'jefatura');

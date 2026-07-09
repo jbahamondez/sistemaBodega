@@ -380,6 +380,13 @@ function testAuthYPermisos_() {
   try { apiUsuarioCambiarEstado(sesionJefa.token, sesionJefa.usuario_id, false); }
   catch (e) { lanzo = e.message.indexOf('propia cuenta') !== -1; }
   assert_(lanzo, 'jefatura no puede desactivar su propia cuenta');
+
+  // La función de bootstrap se bloquea cuando ya existe jefatura activa
+  // (es invocable vía google.script.run por no terminar en "_").
+  lanzo = false;
+  try { setupCrearUsuarioJefatura('Intruso', 'intruso', '9999'); }
+  catch (e) { lanzo = e.message.indexOf('Ya existe un usuario de jefatura') !== -1; }
+  assert_(lanzo, 'setupCrearUsuarioJefatura solo funciona como bootstrap');
 }
 
 /**
