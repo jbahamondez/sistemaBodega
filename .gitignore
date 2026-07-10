@@ -1,5 +1,6 @@
-# clasp: contiene scriptId del entorno de cada desarrollador
+# clasp: contiene scriptId (y deploymentId) de cada entorno
 .clasp.json
+.clasp.*.json
 
 # Credenciales y secretos — nunca subir
 .env
