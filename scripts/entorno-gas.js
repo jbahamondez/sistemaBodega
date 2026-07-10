@@ -56,6 +56,7 @@ class MockSheet {
     return new MockRange(this, row, col, numRows, numCols);
   }
   setFrozenRows() {}
+  deleteRow(rowIndex) { this.data.splice(rowIndex - 1, 1); }
 }
 
 class MockSpreadsheet {

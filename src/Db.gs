@@ -46,10 +46,23 @@ function dbReadAll_(sheetKey) {
   return values.map(function (row, i) {
     var obj = { _rowIndex: i + 2 };
     def.columns.forEach(function (col, j) {
-      obj[col] = utilTrim(row[j]);
+      obj[col] = dbCeldaATexto_(row[j]);
     });
     return obj;
   });
+}
+
+/**
+ * Normaliza el valor de una celda a texto. Sheets convierte los textos
+ * "yyyy-MM-dd HH:mm:ss" en celdas de tipo fecha, y al leerlas vuelven como
+ * objetos Date cuya conversión por defecto es en inglés ("Fri Jul 10 2026…").
+ * Aquí se re-formatean en la zona y formato del sistema.
+ */
+function dbCeldaATexto_(valor) {
+  if (valor instanceof Date) {
+    return Utilities.formatDate(valor, CONFIG.TIMEZONE, 'yyyy-MM-dd HH:mm:ss');
+  }
+  return utilTrim(valor);
 }
 
 /** Devuelve la primera fila cuyo idColumn coincide, o null. */
@@ -143,6 +156,15 @@ function dbUpdateRowByIndex_(sheetKey, rowIndex, patch) {
     }
     sheet.getRange(rowIndex, colIndex + 1).setValue(patch[col]);
   });
+}
+
+/**
+ * Elimina físicamente una fila de una hoja. Usar SOLO para registros sin
+ * historial asociado (p. ej. un usuario creado por error que nunca operó);
+ * todo lo demás se desactiva, nunca se borra.
+ */
+function dbDeleteRowByIndex_(sheetKey, rowIndex) {
+  dbGetSheet_(sheetKey).deleteRow(rowIndex);
 }
 
 /** Lee un valor de la hoja Configuracion. Devuelve defaultValue si no existe. */

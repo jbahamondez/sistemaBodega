@@ -44,7 +44,10 @@ function httpFunciones_() {
     apiUsuarioCrear: apiUsuarioCrear,
     apiUsuarioCambiarEstado: apiUsuarioCambiarEstado,
     apiUsuarioCambiarRol: apiUsuarioCambiarRol,
-    apiUsuarioResetPin: apiUsuarioResetPin
+    apiUsuarioResetPin: apiUsuarioResetPin,
+    apiUsuarioEditar: apiUsuarioEditar,
+    apiUsuarioEliminar: apiUsuarioEliminar,
+    apiCatalogoEstadoLote: apiCatalogoEstadoLote
   };
 }
 

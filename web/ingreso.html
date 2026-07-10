@@ -11,11 +11,30 @@
   }
   * { box-sizing: border-box; }
   body { font-family: system-ui, sans-serif; margin: 0; background: var(--crema); color: #2b2b2b; }
-  header { background: var(--marron); color: #fff; padding: .8rem 1.2rem;
-    display: flex; justify-content: space-between; align-items: center; }
-  header h1 { margin: 0; font-size: 1.15rem; font-weight: 600; }
-  header a { color: #ffd9b3; font-size: .85rem; text-decoration: none; }
   main { max-width: 980px; margin: 0 auto; padding: 1rem 1.2rem 3rem; }
+
+  /* Navbar compartido del sistema */
+  header.navbar { position: sticky; top: 0; z-index: 40; display: flex;
+    justify-content: space-between; align-items: center; gap: .8rem;
+    flex-wrap: wrap; padding: .6rem 1.2rem;
+    background: linear-gradient(135deg, #3e2723 0%, #4e342e 55%, #5d4037 100%);
+    box-shadow: 0 2px 10px rgba(0,0,0,.28); }
+  .navbar .marca { display: flex; align-items: center; gap: .6rem;
+    text-decoration: none; color: #fff; }
+  .navbar .logo { font-size: 1.35rem; width: 2.3rem; height: 2.3rem;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,.12); border-radius: 10px; }
+  .navbar .titulos strong { display: block; font-size: 1rem; line-height: 1.15; }
+  .navbar .titulos small { display: block; color: #d7ccc8; font-size: .68rem;
+    letter-spacing: .08em; text-transform: uppercase; }
+  .navbar nav { display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; }
+  .navbar nav a { color: #efebe9; text-decoration: none; font-size: .86rem;
+    padding: .45rem .85rem; border-radius: 8px; transition: background .15s; }
+  .navbar nav a:hover { background: rgba(255,255,255,.13); }
+  .navbar nav a.activo { background: rgba(255,255,255,.2); font-weight: 600; }
+  .navbar nav a.salir { border: 1px solid rgba(255,217,179,.55); color: #ffd9b3;
+    margin-left: .35rem; }
+  .navbar nav a.salir:hover { background: rgba(198,40,40,.4); border-color: transparent; }
 
   .panel { background: #fff; border: 1px solid var(--borde); border-radius: 8px;
     padding: 1rem; margin-bottom: 1rem; overflow-x: auto; }
@@ -60,8 +79,8 @@
   /* Ajustes táctiles para pantallas chicas */
   @media (max-width: 640px) {
     main { padding: .8rem .6rem 3rem; }
-    header { flex-wrap: wrap; gap: .4rem; }
-    header h1 { font-size: 1rem; }
+    .navbar .titulos strong { font-size: .92rem; }
+    .navbar nav a { padding: .4rem .6rem; font-size: .8rem; }
     #escaneo { font-size: 1.1rem; }
     button.accion { padding: .55rem .8rem; }
     th, td { padding: .55rem .5rem; }
@@ -69,13 +88,18 @@
 </style>
 </head>
 <body>
-<header>
-  <h1>📦 Ingreso de mercadería a bodega</h1>
-  <nav style="display:flex;gap:1rem">
-    <a href="index.html" style="color:#ffd9b3;font-size:.85rem;text-decoration:none">← Inicio</a>
-    <a href="catalogo.html" style="color:#ffd9b3;font-size:.85rem;text-decoration:none">Catálogo</a>
-    <a href="panel.html" style="color:#ffd9b3;font-size:.85rem;text-decoration:none">Panel</a>
-    <a href="#" onclick="event.preventDefault();Sesion.cerrar()" style="color:#ffd9b3;font-size:.85rem;text-decoration:none">Cerrar sesión</a>
+<header class="navbar">
+  <a class="marca" href="index.html">
+    <span class="logo">🍫</span>
+    <span class="titulos"><strong>Sistema Bodega</strong><small>Ingreso de mercadería</small></span>
+  </a>
+  <nav>
+    <a href="index.html">Inicio</a>
+    <a href="ingreso.html" class="activo">Ingreso</a>
+    <a href="catalogo.html">Catálogo</a>
+    <a href="panel.html">Panel</a>
+    <a href="retiro.html">Retiro</a>
+    <a class="salir" href="#" onclick="event.preventDefault();Sesion.cerrar()">Cerrar sesión</a>
   </nav>
 </header>
 

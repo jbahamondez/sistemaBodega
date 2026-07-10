@@ -171,6 +171,12 @@ function apiCatalogoCambiarEstado(token, entidad, id, activar, forzar) {
     CONFIG.ORIGENES_CAMBIO.EDICION_MANUAL, u.usuario_id);
 }
 
+/** Activa/desactiva varios productos de una vez (solo jefatura). */
+function apiCatalogoEstadoLote(token, productoIds, activar) {
+  var u = authValidar_(token, CONFIG.ROLES.JEFATURA);
+  return catalogoCambiarEstadoLoteProductos_(productoIds, activar, u.usuario_id);
+}
+
 function apiCatalogoExportar(token) {
   authValidar_(token, CONFIG.ROLES.JEFATURA);
   return catalogoExportarCsv_();
@@ -237,4 +243,17 @@ function apiUsuarioCambiarRol(token, usuarioId, rol) {
 function apiUsuarioResetPin(token, usuarioId, nuevoPin) {
   authValidar_(token, CONFIG.ROLES.JEFATURA);
   return usuarioResetPin_(usuarioId, nuevoPin);
+}
+
+function apiUsuarioEditar(token, usuarioId, patch) {
+  authValidar_(token, CONFIG.ROLES.JEFATURA);
+  return usuarioEditar_(usuarioId, patch);
+}
+
+function apiUsuarioEliminar(token, usuarioId) {
+  var u = authValidar_(token, CONFIG.ROLES.JEFATURA);
+  if (u.usuario_id === utilTrim(usuarioId)) {
+    throw new Error('No puedes eliminar tu propia cuenta.');
+  }
+  return usuarioEliminar_(usuarioId);
 }

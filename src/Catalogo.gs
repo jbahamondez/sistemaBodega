@@ -244,6 +244,56 @@ function catalogoCambiarEstado_(entidad, id, activar, forzar, origen, usuarioId)
   return { aplicado: true };
 }
 
+/**
+ * Activa o desactiva VARIOS productos en una sola operación (una escritura
+ * a Sheets en vez de una llamada por producto). La interfaz pide una única
+ * confirmación por el lote completo, cumpliendo el espíritu de §8.10; el
+ * historial registra el cambio de cada producto individualmente.
+ */
+function catalogoCambiarEstadoLoteProductos_(productoIds, activar, usuarioId) {
+  usuarioId = usuarioId || CONFIG.USUARIO_PENDIENTE_AUTH;
+  if (!productoIds || productoIds.length === 0) {
+    throw new Error('No se seleccionó ningún producto.');
+  }
+  var nuevoEstado = utilBoolToSheet(!!activar);
+  var buscados = {};
+  productoIds.forEach(function (id) { buscados[utilTrim(id)] = true; });
+
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(CONFIG.LOCK_TIMEOUT_MS)) {
+    throw new Error('El sistema está procesando otra operación. Intenta nuevamente.');
+  }
+  try {
+    var productos = dbReadAll_('PRODUCTOS');
+    var ahora = utilNow();
+    var cambiados = [];
+    productos.forEach(function (p) {
+      if (buscados[p.producto_id] && p.activo !== nuevoEstado) {
+        p.activo = nuevoEstado;
+        p.updated_at = ahora;
+        cambiados.push(p.producto_id);
+      }
+    });
+
+    if (cambiados.length > 0) {
+      dbWriteAllRows_('PRODUCTOS', productos);
+      var ids = idNextBatch_('HISTORIAL', cambiados.length);
+      dbAppendRows_('HISTORIAL_CATALOGO', cambiados.map(function (pid, i) {
+        return {
+          historial_id: ids[i], fecha_hora: ahora, usuario_id: usuarioId,
+          entidad: 'PRODUCTO', entidad_id: pid, campo: 'activo',
+          valor_anterior: utilBoolToSheet(!activar), valor_nuevo: nuevoEstado,
+          origen: CONFIG.ORIGENES_CAMBIO.EDICION_MANUAL
+        };
+      }));
+    }
+    return { cambiados: cambiados.length,
+      sin_cambio: productoIds.length - cambiados.length };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 /** Advertencia si la entidad tiene stock o movimientos históricos. */
 function catalogoAdvertenciaDesactivacion_(entidad, registro) {
   var productoId = entidad === 'PRODUCTO' ? registro.producto_id : registro.producto_id;

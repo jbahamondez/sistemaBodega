@@ -57,6 +57,60 @@ function usuarioCrear_(datos) {
     identificador_acceso: identificador, rol: rol };
 }
 
+/** Edita nombre y/o identificador de acceso de un usuario. */
+function usuarioEditar_(usuarioId, patch) {
+  var usuario = dbFindById_('USUARIOS', usuarioId);
+  if (!usuario) throw new Error('Usuario no encontrado: ' + usuarioId);
+
+  var cambios = {};
+  if (patch.nombre !== undefined && utilTrim(patch.nombre) !== usuario.nombre) {
+    cambios.nombre = valRequireNonEmpty(patch.nombre, 'nombre');
+  }
+  if (patch.identificador_acceso !== undefined) {
+    var identificador = utilTrim(patch.identificador_acceso).toLowerCase();
+    if (identificador !== usuario.identificador_acceso) {
+      valRequireNonEmpty(identificador, 'identificador de acceso');
+      var duplicado = dbFindOne_('USUARIOS', function (u) {
+        return u.identificador_acceso === identificador &&
+               u.usuario_id !== usuario.usuario_id;
+      });
+      if (duplicado) {
+        throw new Error('Ya existe un usuario con identificador "' + identificador + '".');
+      }
+      cambios.identificador_acceso = identificador;
+    }
+  }
+  if (Object.keys(cambios).length === 0) {
+    return { usuario_id: usuarioId, sin_cambios: true };
+  }
+  cambios.updated_at = utilNow();
+  dbUpdateById_('USUARIOS', usuarioId, cambios);
+  return { usuario_id: usuarioId, sin_cambios: false };
+}
+
+/**
+ * Elimina físicamente un usuario SOLO si nunca registró movimientos (p. ej.
+ * creado por error con un dato equivocado). Si tiene movimientos, se niega
+ * y sugiere desactivarlo: la trazabilidad exige conservar al responsable
+ * de cada operación (§16).
+ */
+function usuarioEliminar_(usuarioId) {
+  var usuario = dbFindById_('USUARIOS', usuarioId);
+  if (!usuario) throw new Error('Usuario no encontrado: ' + usuarioId);
+
+  var tieneMovimientos = dbFindOne_('MOVIMIENTOS', function (m) {
+    return m.usuario_id === usuario.usuario_id;
+  });
+  if (tieneMovimientos) {
+    throw new Error(
+      'Este usuario tiene movimientos registrados y no puede eliminarse ' +
+      '(la trazabilidad conserva al responsable de cada operación). ' +
+      'Desactívalo en su lugar.');
+  }
+  dbDeleteRowByIndex_('USUARIOS', usuario._rowIndex);
+  return { usuario_id: usuarioId, eliminado: true };
+}
+
 /** Activa o desactiva un usuario. */
 function usuarioCambiarEstado_(usuarioId, activar) {
   var usuario = dbFindById_('USUARIOS', usuarioId);

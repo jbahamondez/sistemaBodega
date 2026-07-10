@@ -66,6 +66,8 @@ const projectGlobals = {
   dbGetConfigValue_: 'readonly',
   dbSetConfigValue_: 'readonly',
   dbWriteAllRows_: 'readonly',
+  dbDeleteRowByIndex_: 'readonly',
+  dbCeldaATexto_: 'readonly',
   // Ids.gs
   idNext_: 'readonly',
   idNextBatch_: 'readonly',
@@ -80,6 +82,7 @@ const projectGlobals = {
   catalogoCrearFormato_: 'readonly',
   catalogoEditarFormato_: 'readonly',
   catalogoCambiarEstado_: 'readonly',
+  catalogoCambiarEstadoLoteProductos_: 'readonly',
   catalogoAdvertenciaDesactivacion_: 'readonly',
   catalogoValidarCodigoBarrasUnico_: 'readonly',
   catalogoBuscarPorCodigoBarras_: 'readonly',
@@ -122,6 +125,8 @@ const projectGlobals = {
   usuarioCambiarEstado_: 'readonly',
   usuarioCambiarRol_: 'readonly',
   usuarioResetPin_: 'readonly',
+  usuarioEditar_: 'readonly',
+  usuarioEliminar_: 'readonly',
   // Api.gs (capa pública; referenciada por Http.gs y las pruebas)
   apiLogin: 'readonly',
   apiLogout: 'readonly',
@@ -155,6 +160,9 @@ const projectGlobals = {
   apiUsuarioCambiarEstado: 'readonly',
   apiUsuarioCambiarRol: 'readonly',
   apiUsuarioResetPin: 'readonly',
+  apiUsuarioEditar: 'readonly',
+  apiUsuarioEliminar: 'readonly',
+  apiCatalogoEstadoLote: 'readonly',
   // Http.gs
   httpFunciones_: 'readonly',
   doPost: 'readonly',

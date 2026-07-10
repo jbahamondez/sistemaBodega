@@ -19,6 +19,7 @@ function runFoundationTests() {
     testToCsv_,
     testPlantillaImportacion_,
     testBackupLogicaPura_,
+    testCeldaFecha_,
     testIdGenerationIntegration_
   ];
 
@@ -169,7 +170,7 @@ function runMovimientoTests() {
   var resultados = [];
   var tests = [testMovimientosCasos_, testAuthYPermisos_,
     testCorreccionCaso6_, testImportacionCasos_, testHttpRouter_,
-    testPlanillaRealChocolateria_];
+    testPlanillaRealChocolateria_, testGestionUsuarios_, testEstadoLote_];
   tests.forEach(function (t) {
     try {
       t();
@@ -642,6 +643,80 @@ function testBackupLogicaPura_() {
     'backupVencidos_ solo marca lo que supera los 14 días');
   assert_(!vencidos.some(function (v) { return v.nombre === 'hoy' || v.nombre === 'ayer'; }),
     'backupVencidos_ no marca como vencido lo reciente');
+}
+
+/** Fechas: Sheets devuelve Date en celdas de fecha; deben salir en formato propio. */
+function testCeldaFecha_() {
+  var resultado = dbCeldaATexto_(new Date(2026, 6, 10, 11, 58, 35));
+  assert_(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(resultado),
+    'una celda Date se normaliza a yyyy-MM-dd HH:mm:ss (no inglés): ' + resultado);
+  assert_(dbCeldaATexto_(' texto ') === 'texto', 'los textos solo se recortan');
+  assert_(dbCeldaATexto_(15) === '15', 'los números pasan a texto');
+}
+
+/** Gestión de usuarios: editar y eliminar con protecciones de trazabilidad. */
+function testGestionUsuarios_() {
+  var temporal = usuarioCrear_({ nombre: 'Temporal Error', identificador_acceso:
+    'temporal.error', rol: 'TRABAJADOR', pin: '1111' });
+
+  // Editar nombre e identificador.
+  usuarioEditar_(temporal.usuario_id,
+    { nombre: 'Temporal Corregido', identificador_acceso: 'temporal.ok' });
+  var editado = dbFindById_('USUARIOS', temporal.usuario_id);
+  assert_(editado.nombre === 'Temporal Corregido' &&
+          editado.identificador_acceso === 'temporal.ok',
+    'usuarioEditar_ actualiza nombre e identificador');
+
+  // Identificador duplicado rechazado.
+  var lanzo = false;
+  try { usuarioEditar_(temporal.usuario_id, { identificador_acceso: 'jefa.test' }); }
+  catch (e) { lanzo = e.message.indexOf('Ya existe') !== -1; }
+  assert_(lanzo, 'usuarioEditar_ rechaza identificador duplicado');
+
+  // Eliminar: el usuario temporal nunca operó → se borra físicamente.
+  usuarioEliminar_(temporal.usuario_id);
+  assert_(dbFindById_('USUARIOS', temporal.usuario_id) === null,
+    'usuario sin movimientos se elimina físicamente');
+
+  // Un usuario CON movimientos no puede eliminarse (trazabilidad §16).
+  var trab = dbFindOne_('USUARIOS', function (u) {
+    return u.identificador_acceso === 'trab.test';
+  });
+  lanzo = false;
+  try { usuarioEliminar_(trab.usuario_id); }
+  catch (e) { lanzo = e.message.indexOf('movimientos registrados') !== -1; }
+  assert_(lanzo, 'usuario con movimientos no se puede eliminar; se sugiere desactivar');
+
+  // Nadie puede eliminarse a sí mismo vía API.
+  var sesion = apiLogin('jefa.test', '1234');
+  lanzo = false;
+  try { apiUsuarioEliminar(sesion.token, sesion.usuario_id); }
+  catch (e) { lanzo = e.message.indexOf('propia cuenta') !== -1; }
+  assert_(lanzo, 'apiUsuarioEliminar bloquea la autoeliminación');
+}
+
+/** Cambio de estado en lote: N productos en una sola operación. */
+function testEstadoLote_() {
+  var p1 = catalogoCrearProducto_({ nombre: 'LOTE Uno', codigo_producto: 'LOTE-1' });
+  var p2 = catalogoCrearProducto_({ nombre: 'LOTE Dos', codigo_producto: 'LOTE-2' });
+  var sesion = apiLogin('jefa.test', '1234');
+
+  var r = apiCatalogoEstadoLote(sesion.token, [p1.producto_id, p2.producto_id], false);
+  assert_(r.cambiados === 2, 'lote desactiva los 2 productos en una operación');
+  assert_(dbFindById_('PRODUCTOS', p1.producto_id).activo === 'NO' &&
+          dbFindById_('PRODUCTOS', p2.producto_id).activo === 'NO',
+    'ambos productos quedaron inactivos');
+  var enHistorial = dbFindWhere_('HISTORIAL_CATALOGO', function (h) {
+    return (h.entidad_id === p1.producto_id || h.entidad_id === p2.producto_id) &&
+           h.campo === 'activo';
+  });
+  assert_(enHistorial.length === 2, 'el historial registra cada producto del lote');
+
+  // Reactivar: uno ya activo no cuenta como cambiado.
+  apiCatalogoEstadoLote(sesion.token, [p1.producto_id], true);
+  var r2 = apiCatalogoEstadoLote(sesion.token, [p1.producto_id, p2.producto_id], true);
+  assert_(r2.cambiados === 1 && r2.sin_cambio === 1,
+    'el lote informa cambiados vs sin cambio');
 }
 
 /** Integración: requiere setupDatabase() ejecutado. Se omite si no lo está. */
