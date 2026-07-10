@@ -18,6 +18,7 @@ function runFoundationTests() {
     testParseCsv_,
     testToCsv_,
     testPlantillaImportacion_,
+    testBackupLogicaPura_,
     testIdGenerationIntegration_
   ];
 
@@ -615,6 +616,32 @@ function testPlanillaRealChocolateria_() {
     'AGREGAR_Y_ACTUALIZAR');
   assert_(prevOficial.ok && prevOficial.filas[0].datos.tipo_empaque === 'DISPLAY',
     'plantilla oficial: sin cambios de comportamiento');
+}
+
+/**
+ * Backup.gs — solo la lógica PURA (sin tocar Drive), segura de ejecutar en
+ * cualquier entorno, incluida la base real: backupEjecutar_ en sí crea
+ * archivos reales en Drive y por eso NO se prueba aquí (ver run-tests.js,
+ * que la ensaya contra el mock local, nunca contra Apps Script real).
+ */
+function testBackupLogicaPura_() {
+  assert_(backupNombreArchivo_('2026-07-10') ===
+    CONFIG.SPREADSHEET_NAME + ' — respaldo 2026-07-10',
+    'nombre de archivo de respaldo incluye la fecha');
+
+  var ahora = new Date('2026-07-10T12:00:00');
+  var archivos = [
+    { nombre: 'hoy', creadoEn: new Date('2026-07-10T03:00:00') },
+    { nombre: 'ayer', creadoEn: new Date('2026-07-09T03:00:00') },
+    { nombre: 'hace 15 dias', creadoEn: new Date('2026-06-25T03:00:00') },
+    { nombre: 'hace 20 dias', creadoEn: new Date('2026-06-20T03:00:00') }
+  ];
+  var vencidos = backupVencidos_(archivos, ahora, 14);
+  assert_(vencidos.length === 2, 'backupVencidos_ detecta exactamente los 2 fuera de retención');
+  assert_(vencidos.every(function (v) { return v.nombre.indexOf('dias') !== -1; }),
+    'backupVencidos_ solo marca lo que supera los 14 días');
+  assert_(!vencidos.some(function (v) { return v.nombre === 'hoy' || v.nombre === 'ayer'; }),
+    'backupVencidos_ no marca como vencido lo reciente');
 }
 
 /** Integración: requiere setupDatabase() ejecutado. Se omite si no lo está. */

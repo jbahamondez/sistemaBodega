@@ -76,12 +76,44 @@ class MockSpreadsheet {
   deleteSheet(sheet) { this.sheets.delete(sheet.getName()); }
 }
 
+// --------------------- Mock mínimo de Drive (para Backup.gs) ---------------
+class MockDriveFile {
+  constructor(name, id) {
+    this.name = name;
+    this.id = id || 'drivefile-' + crypto.randomUUID();
+    this.trashed = false;
+    this.created = new Date(); // mutable: los tests pueden "envejecer" un archivo
+  }
+  getId() { return this.id; }
+  getName() { return this.name; }
+  getDateCreated() { return this.created; }
+  setTrashed(v) { this.trashed = v; return this; }
+  makeCopy(nombre, carpeta) {
+    const copia = new MockDriveFile(nombre);
+    if (carpeta) carpeta.agregarArchivo(copia);
+    return copia;
+  }
+}
+class MockDriveFolder {
+  constructor(name) { this.name = name; this.archivos = []; }
+  getName() { return this.name; }
+  agregarArchivo(f) { this.archivos.push(f); }
+  getFiles() {
+    const vivos = this.archivos.filter((f) => !f.trashed);
+    let i = 0;
+    return { hasNext: () => i < vivos.length, next: () => vivos[i++] };
+  }
+}
+
 /** Crea el contexto con mocks y todos los .gs cargados. */
 module.exports = function crearEntornoGas(opciones) {
   opciones = opciones || {};
   const spreadsheets = new Map();
   const scriptProperties = {};
   const cacheStore = {};
+  const driveFilesById = new Map();
+  const driveFolders = new Map();
+  const triggers = [];
 
   const context = {
     SpreadsheetApp: {
@@ -126,6 +158,39 @@ module.exports = function crearEntornoGas(opciones) {
     },
     Logger: { log: opciones.silencioso ? () => {} : (m) => console.log(m) },
     HtmlService: {},
+    DriveApp: {
+      getFileById: (id) => {
+        if (!driveFilesById.has(id)) driveFilesById.set(id, new MockDriveFile('archivo-' + id, id));
+        return driveFilesById.get(id);
+      },
+      getFoldersByName: (nombre) => {
+        const encontrada = driveFolders.has(nombre) ? [driveFolders.get(nombre)] : [];
+        let i = 0;
+        return { hasNext: () => i < encontrada.length, next: () => encontrada[i++] };
+      },
+      createFolder: (nombre) => {
+        const carpeta = new MockDriveFolder(nombre);
+        driveFolders.set(nombre, carpeta);
+        return carpeta;
+      }
+    },
+    ScriptApp: {
+      getProjectTriggers: () => triggers,
+      newTrigger: (fn) => {
+        const builder = {
+          _fn: fn,
+          timeBased: () => builder,
+          everyDays: () => builder,
+          atHour: () => builder,
+          create: () => {
+            const t = { getHandlerFunction: () => fn };
+            triggers.push(t);
+            return t;
+          }
+        };
+        return builder;
+      }
+    },
     ContentService: {
       MimeType: { JSON: 'JSON' },
       createTextOutput: (s) => ({

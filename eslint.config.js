@@ -158,12 +158,19 @@ const projectGlobals = {
   // Http.gs
   httpFunciones_: 'readonly',
   doPost: 'readonly',
+  // Backup.gs
+  backupNombreArchivo_: 'readonly',
+  backupVencidos_: 'readonly',
+  backupEjecutar_: 'readonly',
+  backupObtenerCarpeta_: 'readonly',
+  setupInstalarRespaldoDiario: 'readonly',
   // Setup.gs
   setupDatabase: 'readonly',
   setupCrearUsuarioJefatura: 'readonly',
   // SelfTest.gs
   assert_: 'readonly',
-  runMovimientoTests: 'readonly'
+  runMovimientoTests: 'readonly',
+  testBackupLogicaPura_: 'readonly'
 };
 
 module.exports = [

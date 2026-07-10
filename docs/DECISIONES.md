@@ -285,3 +285,42 @@ percibidos) a 0 viajes bloqueantes + 1 de datos (~1-3 s), con la interfaz
 visible al instante. El piso de ~1-3 s por llamada es inherente a Apps
 Script; para bajar de ahí la ruta es migrar la capa de datos (Etapa 3 del
 PDF: PostgreSQL/Supabase).
+
+## D-027 — Se descarta el flujo QA obligatorio: main directo + respaldo diario
+
+El usuario prefirió trabajar directo en `main` con rollback de código en
+vez de mantener una rama `develop` + entorno QA obligatorio para cada
+cambio. Análisis que sustentó la decisión: rollback de código (git revert +
+redeploy) y de frontend (Pages redeploya solo) son rápidos y confiables;
+Apps Script además versiona cada despliegue, permitiendo apuntar la URL a
+una versión anterior sin tocar git. El hueco real es que un rollback de
+código NO deshace escrituras ya hechas en los DATOS (Sheets) antes de
+notar y revertir un bug — eso llevó a priorizar D-028 (respaldo diario)
+como mitigación real, en vez de una gate de QA que solo protege código.
+
+Queda un proyecto Apps Script QA + planilla propia ya creados (aislados,
+sin datos), disponibles para probar cambios riesgosos puntualmente sin
+mantenerlos como parte del flujo habitual. `scripts/deploy.js` soporta
+ambos entornos (`node scripts/deploy.js qa|prod "descripción"`), reutiliza
+siempre el mismo deploymentId por entorno (la URL /exec no cambia entre
+despliegues) y persiste el deploymentId la primera vez que lo crea.
+
+## D-028 — Respaldo diario de la planilla a Drive, con rotación
+
+Complementa —no reemplaza— el historial de versiones nativo de Google
+Sheets: protege contra el hueco identificado en D-027 (escrituras de datos
+que un rollback de código no deshace). `Backup.gs`: `backupEjecutar_`
+copia la planilla activa a la carpeta "Respaldos - Sistema Bodega" en
+Drive con el nombre fechado, y elimina (papelera) los respaldos con más de
+`BACKUP_RETENCION_DIAS` (14) días. `setupInstalarRespaldoDiario()` instala
+un disparador diario (~03:00) de forma idempotente — se ejecuta una vez
+desde el editor, igual que `setupDatabase()`.
+
+La lógica de retención (`backupVencidos_`) es una función pura, probada en
+`SelfTest.gs` (segura de correr en cualquier entorno, incluida la base
+real). La ejecución con efectos reales (`backupEjecutar_`, creación de
+archivos/carpetas) NUNCA se prueba ahí — solo contra el mock de Drive
+agregado a `scripts/entorno-gas.js`, exclusivamente desde
+`scripts/run-tests.js` — para que `runFoundationTests()`/
+`runMovimientoTests()` sigan siendo 100% seguras de ejecutar contra
+producción sin crear ni borrar archivos reales por accidente.
