@@ -361,6 +361,14 @@ function testAuthYPermisos_() {
   assert_(mios.length === 1 && mios[0].movimiento_id === retiro.movimiento_id,
     'apiMisMovimientos devuelve solo los movimientos propios');
 
+  // Y solo RETIROS: una ENTRADA hecha por el mismo usuario no aparece en
+  // "Mis retiros recientes" (reportado por el usuario en producción).
+  apiIngresoConfirmar(sesionJefa.token,
+    { items: [{ codigo_barras: 'TEST-DSP-001', cantidad_empaques: 1 }] });
+  var retirosJefa = apiMisMovimientos(sesionJefa.token);
+  assert_(retirosJefa.every(function (m) { return m.tipo === 'RETIRO'; }),
+    'apiMisMovimientos excluye entradas y ajustes del propio usuario');
+
   // Token inválido rechazado.
   lanzo = false;
   try { apiSesionInfo('token-invalido'); }

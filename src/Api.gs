@@ -49,10 +49,17 @@ function apiRetiroConfirmar(token, datos) {
   });
 }
 
-/** Retiros recientes del usuario autenticado (§21 "Mis movimientos"). */
+/**
+ * Retiros recientes del usuario autenticado (§21 "Mis movimientos").
+ * Solo RETIROS: las entradas o ajustes que el mismo usuario registre con
+ * otro rol no pertenecen a esta lista.
+ */
 function apiMisMovimientos(token) {
   var u = authValidar_(token);
-  return movListar_({ usuarioId: u.usuario_id }).slice(0, 20);
+  return movListar_({
+    usuarioId: u.usuario_id,
+    tipo: CONFIG.TIPOS_MOVIMIENTO.RETIRO
+  }).slice(0, 20);
 }
 
 // ----------------------- operaciones de jefatura ---------------------------
