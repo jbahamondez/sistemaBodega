@@ -237,3 +237,26 @@ Nota de seguridad para reintentos: como la identificación de productos y
 formatos es por `codigo_producto`/`EAN` (no por posición), reintentar una
 importación que quedó a medias por el bug anterior es seguro — las filas ya
 escritas se reclasifican como SIN_CAMBIOS o ACTUALIZAR, nunca se duplican.
+
+## D-025 — Sesiones durables (fix de deslogueos involuntarios)
+
+Reportado por el usuario: al navegar entre pantallas, el sistema pedía
+login de nuevo. Dos causas corregidas:
+
+1. **Backend**: las sesiones vivían solo en CacheService, que Google
+   documenta como almacenamiento no garantizado (puede purgar entradas en
+   cualquier momento). Ahora cada sesión se guarda además en
+   PropertiesService (durable): si la caché pierde la entrada,
+   `authResolverUsuarioId_` la restaura desde el respaldo y rellena la
+   caché con el TTL restante. El logout borra ambos almacenes y al iniciar
+   sesión se limpian los respaldos vencidos.
+2. **Cliente** (`web/comun.js`): borraba la sesión guardada ante CUALQUIER
+   fallo de verificación — incluidos errores transitorios de red — y
+   también cuando el usuario abría una pantalla de otro rol. Ahora la
+   sesión solo se descarta cuando el servidor confirma que es inválida
+   ("Sesión expirada" / usuario inactivo); los errores de red muestran un
+   aviso para reintentar sin perder la sesión, y el desajuste de rol ofrece
+   volver al inicio o entrar con otra cuenta, conservando la sesión.
+
+Con prueba de resiliencia: purgar la caché manualmente y validar que la
+sesión se restaura; y que tras logout NO se restaura.

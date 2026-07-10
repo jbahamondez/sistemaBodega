@@ -42,6 +42,8 @@
     '<label>PIN<input id="sesion-pin" type="password" inputmode="numeric" autocomplete="current-password"></label>' +
     '<div id="sesion-error"></div>' +
     '<button type="submit" id="sesion-boton">Entrar</button>' +
+    '<p style="text-align:center;margin:.8rem 0 0"><a href="index.html" ' +
+    'style="color:#6d4c41;font-size:.85rem">← Volver al inicio</a></p>' +
     '</form></div></div>' +
     '<div id="sesion-chip"><span id="sesion-nombre"></span>' +
     '<button type="button" id="sesion-salir">Salir</button></div>';
@@ -100,9 +102,11 @@
   }
   function completar() {
     if (pendiente.rolRequerido && datos.rol !== pendiente.rolRequerido) {
-      guardar(null);
-      mostrarLogin('Esta pantalla requiere rol ' + pendiente.rolRequerido +
-        '. Inicia sesión con una cuenta autorizada.');
+      // La sesión NO se borra: no tener el rol de una pantalla no es un
+      // problema de sesión. Se ofrece volver o entrar con otra cuenta.
+      mostrarLogin('Tu usuario (' + datos.rol + ') no tiene acceso a esta ' +
+        'pantalla (requiere ' + pendiente.rolRequerido + '). Vuelve al ' +
+        'inicio o entra con otra cuenta.');
       return;
     }
     ocultarLogin();
@@ -141,9 +145,18 @@
         guardar({ token: guardada.token, usuario_id: info.usuario_id,
           nombre: info.nombre, rol: info.rol });
         completar();
-      }, function () {
-        guardar(null);
-        mostrarLogin('');
+      }, function (err) {
+        var msg = (err && err.message) || '';
+        // Solo se descarta la sesión si el SERVIDOR dice que es inválida.
+        // Un error transitorio (red, servidor lento) no borra nada: se pide
+        // reintentar y la sesión guardada sigue disponible.
+        if (msg.indexOf('Sesión expirada') !== -1 || msg.indexOf('inactivo') !== -1) {
+          guardar(null);
+          mostrarLogin('');
+          return;
+        }
+        mostrarLogin('No se pudo verificar la sesión (' + msg +
+          '). Revisa tu conexión y recarga la página, o vuelve a entrar.');
       });
     },
 

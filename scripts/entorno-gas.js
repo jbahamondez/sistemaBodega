@@ -99,7 +99,9 @@ module.exports = function crearEntornoGas(opciones) {
     PropertiesService: {
       getScriptProperties: () => ({
         getProperty: (k) => (k in scriptProperties ? scriptProperties[k] : null),
-        setProperty: (k, v) => { scriptProperties[k] = String(v); }
+        setProperty: (k, v) => { scriptProperties[k] = String(v); },
+        deleteProperty: (k) => { delete scriptProperties[k]; },
+        getProperties: () => Object.assign({}, scriptProperties)
       })
     },
     LockService: {

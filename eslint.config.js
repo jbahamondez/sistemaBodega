@@ -113,6 +113,9 @@ const projectGlobals = {
   authLogin_: 'readonly',
   authLogout_: 'readonly',
   authValidar_: 'readonly',
+  authGuardarSesion_: 'readonly',
+  authResolverUsuarioId_: 'readonly',
+  authLimpiarSesionesExpiradas_: 'readonly',
   // Usuarios.gs
   usuariosListar_: 'readonly',
   usuarioCrear_: 'readonly',

@@ -367,6 +367,21 @@ function testAuthYPermisos_() {
   catch (e) { lanzo = e.message.indexOf('Sesión expirada') !== -1; }
   assert_(lanzo, 'token inválido rechazado');
 
+  // Resiliencia D-025: si CacheService purga la sesión, el respaldo durable
+  // en PropertiesService la restaura sin desloguear al usuario.
+  CacheService.getScriptCache().remove('sesion_' + sesionJefa.token);
+  var restaurada = apiSesionInfo(sesionJefa.token);
+  assert_(restaurada.rol === 'JEFATURA',
+    'la sesión sobrevive una purga de caché (respaldo durable)');
+
+  // El logout elimina la sesión de ambos almacenes.
+  apiLogout(sesionJefa.token);
+  lanzo = false;
+  try { apiSesionInfo(sesionJefa.token); }
+  catch (e) { lanzo = e.message.indexOf('Sesión expirada') !== -1; }
+  assert_(lanzo, 'tras logout la sesión no se restaura desde el respaldo');
+  sesionJefa = apiLogin('jefa.test', '1234'); // re-login para pruebas siguientes
+
   // Un usuario desactivado no puede operar aunque conserve su token.
   usuarioCambiarEstado_(trabCreado.usuario_id, false);
   lanzo = false;
