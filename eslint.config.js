@@ -132,6 +132,7 @@ const projectGlobals = {
   apiIngresoConfirmar: 'readonly',
   apiAjusteConfirmar: 'readonly',
   apiPanelDashboard: 'readonly',
+  apiPanelInicial: 'readonly',
   apiInvListar: 'readonly',
   apiMovListar: 'readonly',
   apiMovObtenerDetalle: 'readonly',

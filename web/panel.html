@@ -242,8 +242,16 @@ function tablaMovimientos(movs) {
 }
 
 // ------------------------------- dashboard ---------------------------------
-function cargarDashboard() {
-  llamar('apiPanelDashboard', [], function (d) {
+// Carga inicial combinada (una sola llamada al backend).
+function cargarInicial() {
+  llamar('apiPanelInicial', [], function (r) {
+    renderDashboard(r.dashboard);
+    inventarioCache = r.inventario || [];
+    renderInventario();
+    poblarSelectsProducto();
+  });
+}
+function renderDashboard(d) {
     document.getElementById('kpis').innerHTML =
       '<div class="kpi"><strong>' + d.total_productos + '</strong>' +
         '<span>Productos activos</span></div>' +
@@ -269,17 +277,9 @@ function cargarDashboard() {
     document.getElementById('alertas').innerHTML =
       alertas || '<p class="muted">Sin alertas: todos los productos sobre el mínimo.</p>';
     document.getElementById('ultimos').innerHTML = tablaMovimientos(d.ultimos_movimientos);
-  });
 }
 
 // ------------------------------- inventario --------------------------------
-function cargarInventario() {
-  llamar('apiInvListar', [], function (r) {
-    inventarioCache = r || [];
-    renderInventario();
-    poblarSelectsProducto();
-  });
-}
 function renderInventario() {
   var filtro = (document.getElementById('buscar-inv').value || '').toLowerCase();
   var visibles = inventarioCache.filter(function (p) {
@@ -467,8 +467,7 @@ function cargarTrazabilidad() {
 // -------------------------------- arranque ---------------------------------
 // El panel es exclusivo de jefatura (§12.4); el servidor revalida cada llamada.
 Sesion.asegurar('JEFATURA', function () {
-  cargarDashboard();
-  cargarInventario();
+  cargarInicial();
 });
 </script>
 </body>

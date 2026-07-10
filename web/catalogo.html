@@ -161,7 +161,22 @@
       <h2>Plantilla y exportación</h2>
       <button class="accion" onclick="descargarPlantilla()">⬇ Descargar plantilla</button>
       <button class="accion" onclick="exportarCatalogo()">⬇ Exportar catálogo actual</button>
-      <ul class="instrucciones" id="instrucciones"></ul>
+      <ul class="instrucciones">
+        <li>Una fila por FORMATO de empaque. Si un producto tiene varios formatos
+          (display, caja, unidad), repetir los datos del producto en cada fila.</li>
+        <li>nombre_producto, codigo_barras y unidades_por_empaque son obligatorios.
+          También se acepta la planilla real (Cod producto / Descripcion del
+          producto (Nombre) / EAN / Cantidad).</li>
+        <li>codigo_producto es opcional pero recomendado: identifica al producto
+          de forma estable entre importaciones.</li>
+        <li>tipo_empaque: DISPLAY, CAJA, UNIDAD u OTRO. Si falta, se deriva de
+          las unidades (1 → Unidad; más de 1 → Caja x N).</li>
+        <li>unidades_por_empaque: entero mayor que 0 (cuántas unidades contiene
+          la caja o display).</li>
+        <li>activo: SI o NO (vacío se interpreta como SI).</li>
+        <li>Los códigos de barras se tratan como texto: se conservan los ceros
+          iniciales exactamente como se escriban.</li>
+      </ul>
     </div>
 
     <div class="panel">
@@ -515,13 +530,10 @@ function cargarHistorial() {
 
 // -------------------------------- arranque --------------------------------
 // Solo jefatura puede administrar el catálogo (§12.4); el servidor lo
-// revalida en cada llamada.
+// revalida en cada llamada. Las instrucciones de la plantilla están
+// embebidas en el HTML (sin viaje al servidor).
 Sesion.asegurar('JEFATURA', function () {
   cargarCatalogo();
-  llamar('apiImportInstrucciones', [], function (lista) {
-    document.getElementById('instrucciones').innerHTML =
-      (lista || []).map(function (i) { return '<li>' + esc(i) + '</li>'; }).join('');
-  });
 });
 </script>
 </body>

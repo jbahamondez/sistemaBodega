@@ -22,6 +22,7 @@ function httpFunciones_() {
     apiIngresoConfirmar: apiIngresoConfirmar,
     apiAjusteConfirmar: apiAjusteConfirmar,
     apiPanelDashboard: apiPanelDashboard,
+    apiPanelInicial: apiPanelInicial,
     apiInvListar: apiInvListar,
     apiMovListar: apiMovListar,
     apiMovObtenerDetalle: apiMovObtenerDetalle,

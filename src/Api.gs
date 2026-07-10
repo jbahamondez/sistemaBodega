@@ -103,6 +103,19 @@ function apiPanelDashboard(token) {
   return panelDashboard_();
 }
 
+/**
+ * Carga inicial del panel en UNA llamada (rendimiento): dashboard e
+ * inventario juntos, reutilizando la misma lectura de inventario.
+ */
+function apiPanelInicial(token) {
+  authValidar_(token, CONFIG.ROLES.JEFATURA);
+  var inventario = invListar_();
+  return {
+    dashboard: panelDashboard_(inventario),
+    inventario: inventario
+  };
+}
+
 function apiInvListar(token) {
   authValidar_(token, CONFIG.ROLES.JEFATURA);
   return invListar_();

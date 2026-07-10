@@ -361,6 +361,13 @@ function testAuthYPermisos_() {
   assert_(mios.length === 1 && mios[0].movimiento_id === retiro.movimiento_id,
     'apiMisMovimientos devuelve solo los movimientos propios');
 
+  // Carga combinada del panel (rendimiento): una llamada trae dashboard e
+  // inventario coherentes entre sí.
+  var inicial = apiPanelInicial(sesionJefa.token);
+  assert_(inicial.dashboard && inicial.inventario &&
+          inicial.dashboard.total_productos === inicial.inventario.length,
+    'apiPanelInicial entrega dashboard e inventario coherentes');
+
   // Y solo RETIROS: una ENTRADA hecha por el mismo usuario no aparece en
   // "Mis retiros recientes" (reportado por el usuario en producción).
   apiIngresoConfirmar(sesionJefa.token,

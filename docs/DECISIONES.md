@@ -260,3 +260,28 @@ login de nuevo. Dos causas corregidas:
 
 Con prueba de resiliencia: purgar la caché manualmente y validar que la
 sesión se restaura; y que tras logout NO se restaura.
+
+## D-026 — Rendimiento: sesión optimista y carga del panel en una llamada
+
+Reportado por el usuario: pantallas y datos lentos. Cada llamada a Apps
+Script tiene ~1-3 s de latencia base (realidad del plan gratuito), y cada
+página hacía 2-3 llamadas SECUENCIALES: verificación de sesión bloqueante +
+una o dos de datos. Cambios:
+
+1. **Sesión optimista** (`web/comun.js`): la página se pinta de inmediato
+   con la sesión de localStorage, sin esperar al servidor. La seguridad no
+   depende de eso: cada operación de datos valida el token en el servidor
+   de todos modos; si la sesión murió, la primera llamada devuelve "Sesión
+   expirada" y aparece el login. La revalidación explícita ocurre en
+   segundo plano y como máximo cada 10 minutos.
+2. **apiPanelInicial**: dashboard + inventario en una sola llamada,
+   reutilizando la misma lectura de inventario en el servidor (antes se
+   leía dos veces).
+3. **Instrucciones de importación embebidas** en catalogo.html (eran
+   estáticas; viajaban por API sin necesidad).
+
+Resultado: abrir una pantalla pasó de 2-3 viajes secuenciales (~4-8 s
+percibidos) a 0 viajes bloqueantes + 1 de datos (~1-3 s), con la interfaz
+visible al instante. El piso de ~1-3 s por llamada es inherente a Apps
+Script; para bajar de ahí la ruta es migrar la capa de datos (Etapa 3 del
+PDF: PostgreSQL/Supabase).

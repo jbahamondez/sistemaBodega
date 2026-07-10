@@ -7,9 +7,9 @@
  * configurado (clave stock_minimo_default en Configuracion) y últimos
  * movimientos confirmados.
  */
-function panelDashboard_() {
+function panelDashboard_(inventarioYaLeido) {
   var stockMinimo = utilToInt(dbGetConfigValue_('stock_minimo_default', '10')) || 0;
-  var inventario = invListar_();
+  var inventario = inventarioYaLeido || invListar_();
 
   var stockTotal = 0;
   var sinStock = [];

@@ -123,6 +123,7 @@
     ], function (r) {
       boton.disabled = false;
       document.getElementById('sesion-pin').value = '';
+      r.validada = Date.now();
       guardar(r);
       completar();
     }, function (err) {
@@ -151,26 +152,34 @@
   // ----------------------------- API pública -------------------------------
   window.Sesion = {
     /** Garantiza sesión válida (y rol, si se exige) antes de ejecutar onListo. */
+    /**
+     * Sesión OPTIMISTA (rendimiento): la página se pinta de inmediato con
+     * la sesión guardada, sin esperar un viaje al servidor. La seguridad no
+     * depende de esto: CADA operación de datos valida el token en el
+     * servidor de todos modos; si la sesión murió, la primera llamada
+     * responde "Sesión expirada" y aparece el login. Si la última
+     * validación es antigua, se revalida en segundo plano sin bloquear.
+     */
     asegurar: function (rolRequerido, onListo) {
       pendiente = { rolRequerido: rolRequerido, onListo: onListo };
       var guardada = leer();
       if (!guardada || !guardada.token) { mostrarLogin(''); return; }
+      datos = guardada;
+      completar();
+
+      var VALIDEZ_MS = 10 * 60 * 1000; // revalidar como máximo cada 10 min
+      if (guardada.validada && Date.now() - guardada.validada < VALIDEZ_MS) return;
       llamarServidor('apiSesionInfo', [guardada.token], function (info) {
         guardar({ token: guardada.token, usuario_id: info.usuario_id,
-          nombre: info.nombre, rol: info.rol });
-        completar();
+          nombre: info.nombre, rol: info.rol, validada: Date.now() });
       }, function (err) {
         var msg = (err && err.message) || '';
-        // Solo se descarta la sesión si el SERVIDOR dice que es inválida.
-        // Un error transitorio (red, servidor lento) no borra nada: se pide
-        // reintentar y la sesión guardada sigue disponible.
+        // Solo se descarta la sesión si el SERVIDOR dice que es inválida;
+        // los errores transitorios de red no borran nada.
         if (msg.indexOf('Sesión expirada') !== -1 || msg.indexOf('inactivo') !== -1) {
           guardar(null);
-          mostrarLogin('');
-          return;
+          mostrarLogin('La sesión expiró. Vuelve a entrar.');
         }
-        mostrarLogin('No se pudo verificar la sesión (' + msg +
-          '). Revisa tu conexión y recarga la página, o vuelve a entrar.');
       });
     },
 
