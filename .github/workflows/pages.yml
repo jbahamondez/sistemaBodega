@@ -2,7 +2,7 @@ name: Publicar frontend en GitHub Pages
 
 on:
   push:
-    branches: [main, feature/mvp-control-bodega]
+    branches: [main]
     paths: ['web/**', '.github/workflows/pages.yml']
   workflow_dispatch:
 
