@@ -79,7 +79,14 @@
 </style>
 </head>
 <body>
-<header><h1>🍫 Sistema Bodega — Administración del catálogo</h1></header>
+<header style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:.5rem">
+  <h1>🍫 Sistema Bodega — Administración del catálogo</h1>
+  <nav style="display:flex;gap:1rem">
+    <a href="index.html" style="color:#ffd9b3;font-size:.85rem;text-decoration:none">← Inicio</a>
+    <a href="panel.html" style="color:#ffd9b3;font-size:.85rem;text-decoration:none">Panel</a>
+    <a href="#" onclick="event.preventDefault();Sesion.cerrar()" style="color:#ffd9b3;font-size:.85rem;text-decoration:none">Cerrar sesión</a>
+  </nav>
+</header>
 <div id="aviso"></div>
 
 <main>

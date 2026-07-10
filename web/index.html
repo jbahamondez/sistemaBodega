@@ -24,7 +24,10 @@
 </style>
 </head>
 <body>
-<header><h1>🍫 Sistema de Control y Trazabilidad de Bodega</h1></header>
+<header style="display:flex;justify-content:space-between;align-items:center;gap:.5rem">
+  <h1>🍫 Sistema de Control y Trazabilidad de Bodega</h1>
+  <a href="#" onclick="event.preventDefault();Sesion.cerrar()" style="color:#ffd9b3;font-size:.85rem;text-decoration:none;white-space:nowrap">Cerrar sesión</a>
+</header>
 <main>
   <p id="saludo" class="muted">Cargando…</p>
 

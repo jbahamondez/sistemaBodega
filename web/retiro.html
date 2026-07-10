@@ -66,6 +66,13 @@
     border-radius: 10px; pointer-events: none; }
   #flash { position: absolute; inset: 0; background: #4caf50; opacity: 0;
     pointer-events: none; transition: opacity .12s; }
+  /* Tira de resultado sobre el video: qué se escaneó y si fue correcto. */
+  #scan-banner { position: absolute; left: 0; right: 0; bottom: 0; display: none;
+    padding: .8rem .9rem; font-size: 1rem; font-weight: 700; color: #fff;
+    text-align: center; line-height: 1.3; }
+  #scan-banner.ok { display: block; background: rgba(46,125,50,.93); }
+  #scan-banner.err { display: block; background: rgba(198,40,40,.93); }
+  #scan-banner.info { display: block; background: rgba(78,52,46,.9); }
   #detectado { background: #fff; border: 2px solid var(--ok); border-radius: 12px;
     padding: .8rem; margin-bottom: .9rem; display: none; }
   #detectado .nombre { font-size: 1.1rem; font-weight: 700; }
@@ -88,6 +95,8 @@
 <header>
   <button id="btn-atras" style="display:none" onclick="volverInicio()">←</button>
   <h1 id="titulo">Bodega — Retiros</h1>
+  <a href="index.html" style="color:#ffd9b3;text-decoration:none;font-size:.85rem">⌂ Inicio</a>
+  <button onclick="Sesion.cerrar()" style="font-size:.85rem">Salir</button>
 </header>
 
 <main>
@@ -125,6 +134,7 @@
       <video id="video" autoplay muted playsinline></video>
       <div id="marco"></div>
       <div id="flash"></div>
+      <div id="scan-banner"></div>
     </div>
 
     <div id="detectado">
@@ -161,6 +171,7 @@ var cacheCodigos = {};
 var streamActual = null;
 var lectorZXing = null;
 var escaneando = false;
+var escaneoPausado = false; // pausa breve tras cada lectura para mostrar el resultado
 var ultimoScan = { codigo: '', t: 0 };
 var CLAVE_BORRADOR = 'retiro_borrador_v1';
 
@@ -185,6 +196,20 @@ function mostrarVista(nombre) {
   }[nombre];
 }
 function vibrar(ms) { if (navigator.vibrate) navigator.vibrate(ms); }
+
+/** Tira de resultado sobre el video del escáner (ok | err | info). */
+function banner(texto, tipo) {
+  var el = document.getElementById('scan-banner');
+  el.textContent = texto;
+  el.className = tipo || 'info';
+}
+function ocultarBanner() {
+  document.getElementById('scan-banner').className = '';
+}
+/** Reanuda la detección después de mostrar el resultado de una lectura. */
+function reanudarEscaneo(ms) {
+  setTimeout(function () { escaneoPausado = false; }, ms || 1600);
+}
 function beep() {
   try {
     var ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -213,12 +238,16 @@ function cancelarRetiro() {
 // ------------------------------- escáner -----------------------------------
 function abrirEscaner() {
   mensaje('');
+  escaneoPausado = false;
+  ocultarBanner();
   document.getElementById('detectado').style.display = 'none';
   mostrarVista('escaner');
   abrirCamara();
 }
 function cerrarEscaner() {
   cerrarCamara();
+  escaneoPausado = false;
+  ocultarBanner();
   mostrarVista('retiro');
   renderCarro();
 }
@@ -300,10 +329,14 @@ function iniciarZXing() {
 function onCodigoLeido(codigo) {
   codigo = String(codigo || '').trim();
   if (!codigo) return;
+  // Mientras se muestra el resultado de la lectura anterior, no se procesa
+  // ninguna detección nueva: evita registros dobles y deja leer la tira.
+  if (escaneoPausado) return;
   // Debounce (§12): una lectura física puede detectarse en varios frames.
   var ahora = Date.now();
   if (codigo === ultimoScan.codigo && ahora - ultimoScan.t < 2500) return;
   ultimoScan = { codigo: codigo, t: ahora };
+  escaneoPausado = true;
 
   // Confirmación sensorial inmediata (§12): flash + vibración + sonido.
   var flash = document.getElementById('flash');
@@ -311,6 +344,7 @@ function onCodigoLeido(codigo) {
   setTimeout(function () { flash.style.opacity = '0'; }, 160);
   vibrar(90);
   beep();
+  banner('Código leído: ' + codigo + ' — verificando…', 'info');
 
   procesarCodigo(codigo);
 }
@@ -327,26 +361,32 @@ function procesarCodigo(codigo) {
   if (existente) {
     existente.cantidad += 1;
     guardarBorrador();
+    banner('✔ ' + existente.producto_nombre + ' — ahora ' + existente.cantidad +
+      ' empaques (' + existente.cantidad * existente.unidades_por_empaque +
+      ' unidades)', 'ok');
     mostrarDetectado(existente.producto_nombre,
       existente.formato_nombre + ' · ahora ' + existente.cantidad + ' empaques = ' +
       existente.cantidad * existente.unidades_por_empaque + ' unidades');
+    reanudarEscaneo();
     return;
   }
   if (cacheCodigos[codigo]) { agregarAlCarro(cacheCodigos[codigo]); return; }
 
-  mensaje('Buscando código…');
   Sesion.api('apiBuscarCodigo', [codigo], function (r) {
     if (!r.encontrado) {
       // §22 trabajador: no puede crear productos; solo volver a escanear.
-      mensaje('✖ Producto no registrado (' + r.codigo_barras +
-        '). Avisa a jefatura. Puedes escanear otro código.', 'err');
+      banner('✖ PRODUCTO NO REGISTRADO (' + r.codigo_barras +
+        '). Avisa a jefatura.', 'err');
       vibrar([80, 60, 80]);
+      reanudarEscaneo(2500);
       return;
     }
     cacheCodigos[codigo] = r;
     agregarAlCarro(r);
   }, function (err) {
-    mensaje('✖ Error de conexión: ' + ((err && err.message) || err), 'err');
+    banner('✖ Error de conexión: ' + ((err && err.message) || err), 'err');
+    vibrar([200]);
+    reanudarEscaneo(2500);
   });
 }
 function agregarAlCarro(info) {
@@ -359,10 +399,13 @@ function agregarAlCarro(info) {
   });
   guardarBorrador();
   mensaje('');
+  banner('✔ AGREGADO: ' + info.producto_nombre + ' — ' + info.formato_nombre +
+    ' (' + info.unidades_por_empaque + ' unid./empaque)', 'ok');
   mostrarDetectado(info.producto_nombre,
     info.formato_nombre + ' (' + info.tipo_empaque + ') · ' +
     info.unidades_por_empaque + ' unidades por empaque · Stock disponible: ' +
     info.stock_unidades + ' unidades');
+  reanudarEscaneo();
 }
 function mostrarDetectado(nombre, datos) {
   document.getElementById('det-nombre').textContent = '✔ ' + nombre;
