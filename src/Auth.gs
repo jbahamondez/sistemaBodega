@@ -21,8 +21,11 @@ function authLogin_(identificador, pin) {
   var errorGenerico = 'Usuario o PIN incorrecto.';
   if (!identificador || !pin) throw new Error(errorGenerico);
 
+  // El identificador no distingue mayúsculas ("Fran" y "fran" entran igual);
+  // el PIN sí es exacto.
+  var identificadorBuscado = identificador.toLowerCase();
   var usuario = dbFindOne_('USUARIOS', function (u) {
-    return u.identificador_acceso === identificador;
+    return u.identificador_acceso.toLowerCase() === identificadorBuscado;
   });
   if (!usuario || !utilToBool(usuario.activo)) throw new Error(errorGenerico);
   if (!utilSafeEquals(usuario.pin_hash, utilHashPin(pin, usuario.pin_salt))) {

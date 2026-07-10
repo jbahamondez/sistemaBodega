@@ -659,19 +659,25 @@ function testGestionUsuarios_() {
   var temporal = usuarioCrear_({ nombre: 'Temporal Error', identificador_acceso:
     'temporal.error', rol: 'TRABAJADOR', pin: '1111' });
 
-  // Editar nombre e identificador.
+  // Editar nombre e identificador CONSERVANDO mayúsculas (reportado: "fran"
+  // editado a "Fran" quedaba en minúsculas).
   usuarioEditar_(temporal.usuario_id,
-    { nombre: 'Temporal Corregido', identificador_acceso: 'temporal.ok' });
+    { nombre: 'Temporal Corregido', identificador_acceso: 'Temporal.OK' });
   var editado = dbFindById_('USUARIOS', temporal.usuario_id);
   assert_(editado.nombre === 'Temporal Corregido' &&
-          editado.identificador_acceso === 'temporal.ok',
-    'usuarioEditar_ actualiza nombre e identificador');
+          editado.identificador_acceso === 'Temporal.OK',
+    'usuarioEditar_ conserva las mayúsculas del identificador');
 
-  // Identificador duplicado rechazado.
+  // El login no distingue mayúsculas en el identificador.
+  var sesionMayusculas = apiLogin('TEMPORAL.ok', '1111');
+  assert_(sesionMayusculas.usuario_id === temporal.usuario_id,
+    'el login acepta el identificador sin distinguir mayúsculas');
+
+  // Identificador duplicado rechazado, también con mayúsculas distintas.
   var lanzo = false;
-  try { usuarioEditar_(temporal.usuario_id, { identificador_acceso: 'jefa.test' }); }
+  try { usuarioEditar_(temporal.usuario_id, { identificador_acceso: 'JEFA.TEST' }); }
   catch (e) { lanzo = e.message.indexOf('Ya existe') !== -1; }
-  assert_(lanzo, 'usuarioEditar_ rechaza identificador duplicado');
+  assert_(lanzo, 'usuarioEditar_ rechaza duplicado sin distinguir mayúsculas');
 
   // Eliminar: el usuario temporal nunca operó → se borra físicamente.
   usuarioEliminar_(temporal.usuario_id);

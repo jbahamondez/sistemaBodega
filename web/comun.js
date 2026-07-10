@@ -212,3 +212,145 @@
     }
   };
 })();
+
+/**
+ * window.Ui — modales y avisos propios del sistema (temática del navbar),
+ * en reemplazo de alert/confirm/prompt del navegador.
+ *
+ *   Ui.toast(mensaje, 'ok'|'err')                — aviso flotante temporal.
+ *   Ui.confirmar(titulo, mensaje, onConfirmar)   — modal Sí/Cancelar.
+ *   Ui.formulario(titulo, campos, onGuardar)     — modal con inputs.
+ *     campos: [{ id, label, valor, tipo ('text'|'password'), ayuda }]
+ *     onGuardar(valores) recibe { id: valorEscrito, ... }.
+ */
+window.Ui = (function () {
+  'use strict';
+
+  var css =
+    '#ui-modal{position:fixed;inset:0;background:rgba(30,20,15,.55);z-index:120;' +
+    'display:none;align-items:center;justify-content:center;padding:1rem}' +
+    '#ui-modal .caja{background:#fff;border-radius:14px;width:100%;max-width:420px;' +
+    'overflow:hidden;font-family:system-ui,sans-serif;' +
+    'box-shadow:0 12px 40px rgba(0,0,0,.35);animation:ui-pop .16s ease-out}' +
+    '@keyframes ui-pop{from{transform:scale(.94);opacity:0}to{transform:scale(1);opacity:1}}' +
+    '#ui-modal .cabecera{background:linear-gradient(135deg,#3e2723 0%,#4e342e 55%,#5d4037 100%);' +
+    'color:#fff;padding:.85rem 1.2rem;display:flex;align-items:center;gap:.6rem}' +
+    '#ui-modal .cabecera .icono{font-size:1.15rem;background:rgba(255,255,255,.12);' +
+    'border-radius:8px;width:2rem;height:2rem;display:flex;align-items:center;justify-content:center}' +
+    '#ui-modal .cabecera strong{font-size:1rem}' +
+    '#ui-modal .cuerpo{padding:1.1rem 1.2rem;color:#2b2b2b;font-size:.92rem;line-height:1.45}' +
+    '#ui-modal label{display:block;font-size:.82rem;color:#6d4c41;margin-bottom:.75rem}' +
+    '#ui-modal input{width:100%;box-sizing:border-box;padding:.6rem .7rem;font-size:1rem;' +
+    'border:1px solid #e0d7ce;border-radius:8px;margin-top:.25rem}' +
+    '#ui-modal input:focus{outline:none;border-color:#5d4037;box-shadow:0 0 0 3px rgba(93,64,55,.15)}' +
+    '#ui-modal .ayuda{font-size:.75rem;color:#757575;margin:-.45rem 0 .75rem}' +
+    '#ui-modal .ui-error{color:#c62828;font-size:.85rem;min-height:1.1rem;margin:.2rem 0 0}' +
+    '#ui-modal .pie{display:flex;justify-content:flex-end;gap:.5rem;padding:0 1.2rem 1.1rem}' +
+    '#ui-modal button{font-size:.92rem;border-radius:8px;padding:.55rem 1.1rem;cursor:pointer}' +
+    '#ui-modal button.principal{background:#4e342e;color:#fff;border:none;font-weight:600}' +
+    '#ui-modal button.principal:hover{background:#5d4037}' +
+    '#ui-modal button.peligro{background:#c62828;color:#fff;border:none;font-weight:600}' +
+    '#ui-modal button.cancelar{background:#fff;color:#4e342e;border:1px solid #e0d7ce}' +
+    '#ui-modal button.cancelar:hover{background:#faf6f1}' +
+    '#ui-toast{position:fixed;top:.9rem;right:.9rem;z-index:130;max-width:380px;' +
+    'padding:.75rem 1rem;border-radius:10px;font-family:system-ui,sans-serif;' +
+    'font-size:.9rem;display:none;white-space:pre-wrap;' +
+    'box-shadow:0 4px 16px rgba(0,0,0,.28);animation:ui-pop .16s ease-out}' +
+    '#ui-toast.ok{background:#e8f5e9;color:#2e7d32;border:1px solid #2e7d32}' +
+    '#ui-toast.err{background:#fbe9e7;color:#c62828;border:1px solid #c62828}';
+
+  var style = document.createElement('style');
+  style.textContent = css;
+  document.head.appendChild(style);
+  document.body.insertAdjacentHTML('beforeend',
+    '<div id="ui-modal"></div><div id="ui-toast"></div>');
+
+  var modal = document.getElementById('ui-modal');
+  modal.addEventListener('click', function (ev) {
+    if (ev.target === modal) cerrarModal();
+  });
+
+  function esc(s) {
+    return String(s === null || s === undefined ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+  function cerrarModal() {
+    modal.style.display = 'none';
+    modal.innerHTML = '';
+  }
+  function abrirModal(icono, titulo, cuerpoHTML, botones) {
+    modal.innerHTML =
+      '<div class="caja">' +
+      '<div class="cabecera"><span class="icono">' + icono + '</span><strong>' +
+        esc(titulo) + '</strong></div>' +
+      '<div class="cuerpo">' + cuerpoHTML + '</div>' +
+      '<div class="pie">' + botones + '</div>' +
+      '</div>';
+    modal.style.display = 'flex';
+  }
+
+  return {
+    toast: function (mensaje, tipo) {
+      var el = document.getElementById('ui-toast');
+      el.textContent = mensaje;
+      el.className = tipo === 'err' ? 'err' : 'ok';
+      el.style.display = 'block';
+      clearTimeout(el._t);
+      el._t = setTimeout(function () { el.style.display = 'none'; }, 5000);
+    },
+
+    confirmar: function (titulo, mensaje, onConfirmar, opciones) {
+      opciones = opciones || {};
+      abrirModal(opciones.icono || '❓', titulo,
+        '<p style="margin:0;white-space:pre-wrap">' + esc(mensaje) + '</p>',
+        '<button type="button" class="cancelar" id="ui-cancelar">Cancelar</button>' +
+        '<button type="button" class="' + (opciones.peligro ? 'peligro' : 'principal') +
+          '" id="ui-aceptar">' + esc(opciones.textoAceptar || 'Confirmar') + '</button>');
+      document.getElementById('ui-cancelar').addEventListener('click', cerrarModal);
+      document.getElementById('ui-aceptar').addEventListener('click', function () {
+        cerrarModal();
+        onConfirmar();
+      });
+      document.getElementById('ui-aceptar').focus();
+    },
+
+    formulario: function (titulo, campos, onGuardar, opciones) {
+      opciones = opciones || {};
+      var cuerpo = campos.map(function (c) {
+        return '<label>' + esc(c.label) +
+          '<input id="ui-campo-' + esc(c.id) + '" type="' + (c.tipo || 'text') +
+          '" value="' + esc(c.valor || '') + '" autocomplete="off"></label>' +
+          (c.ayuda ? '<p class="ayuda">' + esc(c.ayuda) + '</p>' : '');
+      }).join('') + '<p class="ui-error" id="ui-form-error"></p>';
+      abrirModal(opciones.icono || '✏️', titulo, cuerpo,
+        '<button type="button" class="cancelar" id="ui-cancelar">Cancelar</button>' +
+        '<button type="button" class="principal" id="ui-aceptar">' +
+          esc(opciones.textoAceptar || 'Guardar') + '</button>');
+      document.getElementById('ui-cancelar').addEventListener('click', cerrarModal);
+
+      function enviar() {
+        var valores = {};
+        campos.forEach(function (c) {
+          valores[c.id] = document.getElementById('ui-campo-' + c.id).value;
+        });
+        // onGuardar puede devolver un mensaje de error para mostrarlo sin
+        // cerrar el modal (validaciones locales); si no, el modal se cierra.
+        var error = onGuardar(valores);
+        if (error) {
+          document.getElementById('ui-form-error').textContent = error;
+        } else {
+          cerrarModal();
+        }
+      }
+      document.getElementById('ui-aceptar').addEventListener('click', enviar);
+      modal.querySelectorAll('input').forEach(function (input) {
+        input.addEventListener('keydown', function (ev) {
+          if (ev.key === 'Enter') { ev.preventDefault(); enviar(); }
+        });
+      });
+      var primero = modal.querySelector('input');
+      if (primero) { primero.focus(); primero.select(); }
+    }
+  };
+})();

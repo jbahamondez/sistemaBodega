@@ -220,7 +220,9 @@ module.exports = [
         location: 'readonly',
         setTimeout: 'readonly',
         API_URL: 'readonly',
-        Sesion: 'readonly'
+        Sesion: 'readonly',
+        Ui: 'readonly',
+        clearTimeout: 'readonly'
       }
     },
     rules: {

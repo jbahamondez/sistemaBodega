@@ -5,6 +5,18 @@
  * catálogo). El PIN se guarda solo como hash + salt.
  */
 
+/**
+ * ¿El identificador ya lo usa otro usuario? Comparación sin distinguir
+ * mayúsculas: "Fran" y "fran" son el mismo identificador de login.
+ */
+function usuarioIdentificadorEnUso_(identificador, usuarioIdExcluido) {
+  var buscado = utilTrim(identificador).toLowerCase();
+  return dbFindOne_('USUARIOS', function (u) {
+    return u.identificador_acceso.toLowerCase() === buscado &&
+           u.usuario_id !== usuarioIdExcluido;
+  }) !== null;
+}
+
 /** Lista usuarios sin exponer hash ni salt. */
 function usuariosListar_() {
   return dbReadAll_('USUARIOS').map(function (u) {
@@ -22,8 +34,10 @@ function usuariosListar_() {
 /** Crea un usuario nuevo con PIN inicial. */
 function usuarioCrear_(datos) {
   var nombre = valRequireNonEmpty(datos.nombre, 'nombre');
+  // El identificador CONSERVA las mayúsculas tal como se escribió; el login
+  // y la unicidad lo comparan sin distinguirlas (usuarioIdentificadorEnUso_).
   var identificador = valRequireNonEmpty(datos.identificador_acceso,
-    'identificador de acceso').toLowerCase();
+    'identificador de acceso');
   var rol = utilTrim(datos.rol).toUpperCase();
   var pin = utilTrim(datos.pin);
 
@@ -32,10 +46,7 @@ function usuarioCrear_(datos) {
   }
   if (pin.length < 4) throw new Error('El PIN debe tener al menos 4 dígitos.');
 
-  var existente = dbFindOne_('USUARIOS', function (u) {
-    return u.identificador_acceso === identificador;
-  });
-  if (existente) {
+  if (usuarioIdentificadorEnUso_(identificador, null)) {
     throw new Error('Ya existe un usuario con identificador "' + identificador + '".');
   }
 
@@ -67,14 +78,12 @@ function usuarioEditar_(usuarioId, patch) {
     cambios.nombre = valRequireNonEmpty(patch.nombre, 'nombre');
   }
   if (patch.identificador_acceso !== undefined) {
-    var identificador = utilTrim(patch.identificador_acceso).toLowerCase();
+    // Se conservan las mayúsculas tal como se escriben ("Fran" queda "Fran");
+    // la unicidad y el login no distinguen mayúsculas.
+    var identificador = utilTrim(patch.identificador_acceso);
     if (identificador !== usuario.identificador_acceso) {
       valRequireNonEmpty(identificador, 'identificador de acceso');
-      var duplicado = dbFindOne_('USUARIOS', function (u) {
-        return u.identificador_acceso === identificador &&
-               u.usuario_id !== usuario.usuario_id;
-      });
-      if (duplicado) {
+      if (usuarioIdentificadorEnUso_(identificador, usuario.usuario_id)) {
         throw new Error('Ya existe un usuario con identificador "' + identificador + '".');
       }
       cambios.identificador_acceso = identificador;
