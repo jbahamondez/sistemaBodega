@@ -97,6 +97,26 @@ function dbAppendRows_(sheetKey, objs) {
 }
 
 /**
+ * Reescribe TODAS las filas de datos de una hoja en una sola llamada
+ * (una operación de red en vez de una por celda modificada). `rows` debe
+ * ser el array devuelto por dbReadAll_ para esa misma hoja, en el mismo
+ * orden, con los campos que se quieran cambiar ya modificados en memoria.
+ * Usado por operaciones masivas (p. ej. importación de catálogo) para
+ * evitar cientos de llamadas individuales de escritura.
+ */
+function dbWriteAllRows_(sheetKey, rows) {
+  if (!rows || rows.length === 0) return;
+  var def = CONFIG.SHEETS[sheetKey];
+  var sheet = dbGetSheet_(sheetKey);
+  var values = rows.map(function (obj) {
+    return def.columns.map(function (col) {
+      return obj[col] === undefined || obj[col] === null ? '' : obj[col];
+    });
+  });
+  sheet.getRange(2, 1, values.length, def.columns.length).setValues(values);
+}
+
+/**
  * Actualiza campos de la fila identificada por idColumn === idValue.
  * Solo modifica las columnas presentes en patch. Lanza error si no existe.
  */

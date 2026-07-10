@@ -65,6 +65,7 @@ const projectGlobals = {
   dbUpdateRowByIndex_: 'readonly',
   dbGetConfigValue_: 'readonly',
   dbSetConfigValue_: 'readonly',
+  dbWriteAllRows_: 'readonly',
   // Ids.gs
   idNext_: 'readonly',
   idNextBatch_: 'readonly',
@@ -90,10 +91,10 @@ const projectGlobals = {
   importacionAplicar_: 'readonly',
   importacionListar_: 'readonly',
   importacionLeerFila_: 'readonly',
+  importacionNormalizarEntero_: 'readonly',
   importacionValidarFila_: 'readonly',
   importacionDetectarCambios_: 'readonly',
-  importacionAplicarNuevo_: 'readonly',
-  importacionAplicarActualizacion_: 'readonly',
+  importacionAplicarEnLote_: 'readonly',
   importacionResultadoVacio_: 'readonly',
   // Inventario.gs
   invGetStock_: 'readonly',

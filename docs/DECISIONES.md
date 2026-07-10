@@ -210,3 +210,30 @@ campos vienen vacíos — la plantilla oficial sigue funcionando igual.
 Herramientas nuevas: scripts/leer-xlsx.ps1 (leer Excel sin Excel instalado) y
 scripts/previsualizar-csv.js (ensayo de importación con el motor real sobre
 base simulada). El ensayo con los 128 productos reales dio 0 errores.
+
+## D-024 — Importación masiva reescrita en lotes (bug real detectado en producción)
+
+Al importar la planilla real de 128 productos, la página quedó "colgada": la
+importación original hacía una llamada de red separada a Sheets/LockService
+por cada micro-operación (buscar duplicados, generar ID bajo bloqueo,
+escribir la fila, escribir su historial) DENTRO de un bucle por fila —
+llamando a `catalogoCrearProducto_`/`catalogoCrearFormato_`/`histRegistrar_`
+una vez por cada producto y formato. Para 128 filas esto generaba más de
+2.000 llamadas secuenciales, con riesgo real de superar el límite de
+ejecución de Apps Script (6 min) y dejar el import a medio terminar.
+
+Se reescribió `importacionAplicar_` (ahora delega en
+`importacionAplicarEnLote_`) para operar en memoria y escribir en lotes:
+todos los IDs necesarios se generan de una vez con `idNextBatch_`, las filas
+nuevas se agregan con un único `dbAppendRows_` por hoja, y las
+actualizaciones se aplican reescribiendo la hoja completa en memoria y
+subiéndola con una sola llamada (`dbWriteAllRows_`, nuevo helper en
+`Db.gs`). Medido con `scripts/medir-import.js` sobre la planilla real: **16
+llamadas a Sheets y 5 candados para 128 productos** (antes, más de 2.000).
+Los 16 tests existentes siguen pasando sin cambios de comportamiento
+observable (mismos contadores, mismo historial, misma semántica de §8.6/8.9).
+
+Nota de seguridad para reintentos: como la identificación de productos y
+formatos es por `codigo_producto`/`EAN` (no por posición), reintentar una
+importación que quedó a medias por el bug anterior es seguro — las filas ya
+escritas se reclasifican como SIN_CAMBIOS o ACTUALIZAR, nunca se duplican.

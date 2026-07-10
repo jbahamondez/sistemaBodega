@@ -176,6 +176,13 @@ function importacionPrevisualizar_(csvText, modo) {
  * clasificación bajo bloqueo (el catálogo pudo cambiar entre previsualizar
  * y confirmar), aplica solo filas NUEVO/ACTUALIZAR y registra el resultado
  * en la hoja Importaciones. Las filas con error se omiten y se informan.
+ *
+ * Escribe en LOTES (no fila por fila): con catálogos de cientos de
+ * productos, generar un ID y escribir bajo bloqueo por cada fila
+ * individualmente multiplica las llamadas a Sheets y puede acercarse al
+ * límite de ejecución de Apps Script (6 min). Aquí se generan todos los IDs
+ * necesarios de una vez (idNextBatch_) y se escribe con como máximo un
+ * puñado de llamadas, sin importar cuántas filas traiga la planilla.
  */
 function importacionAplicar_(csvText, modo, nombreArchivo, usuarioId) {
   usuarioId = usuarioId || CONFIG.USUARIO_PENDIENTE_AUTH;
@@ -192,19 +199,7 @@ function importacionAplicar_(csvText, modo, nombreArchivo, usuarioId) {
         prev.erroresGlobales.join(' '));
     }
 
-    var contadores = { productosCreados: 0, productosActualizados: 0,
-      formatosCreados: 0, formatosActualizados: 0 };
-    // Productos creados durante esta importación, para que varias filas del
-    // mismo producto nuevo (distintos formatos) no lo dupliquen.
-    var creadosPorIdentidad = {};
-
-    prev.filas.forEach(function (fila) {
-      if (fila.estado === CONFIG.ESTADOS_FILA_IMPORT.NUEVO) {
-        importacionAplicarNuevo_(fila, creadosPorIdentidad, contadores, origen, usuarioId);
-      } else if (fila.estado === CONFIG.ESTADOS_FILA_IMPORT.ACTUALIZAR) {
-        importacionAplicarActualizacion_(fila, contadores, origen, usuarioId);
-      }
-    });
+    var contadores = importacionAplicarEnLote_(prev, origen, usuarioId);
 
     var registro = {
       importacion_id: idNext_('IMPORTACION'),
@@ -340,72 +335,144 @@ function importacionDetectarCambios_(datos, formato, producto) {
   return cambios;
 }
 
-/** Crea producto (si no existe) y formato para una fila NUEVO. */
-function importacionAplicarNuevo_(fila, creadosPorIdentidad, contadores, origen, usuarioId) {
-  var datos = fila.datos;
-  var identidad = datos.codigo_producto || datos.nombre_producto.toLowerCase();
+/**
+ * Aplica todas las filas NUEVO y ACTUALIZAR de una previsualización con un
+ * número mínimo de llamadas a Sheets: IDs generados en lote, filas nuevas
+ * agregadas con un único dbAppendRows_ por hoja, y actualizaciones escritas
+ * con un único dbWriteAllRows_ por hoja (se reescribe la hoja completa en
+ * memoria y se sube en una sola llamada). Se ejecuta ya bajo el bloqueo de
+ * importacionAplicar_, así que no hay riesgo de que otro proceso escriba
+ * entre medio.
+ */
+function importacionAplicarEnLote_(prev, origen, usuarioId) {
+  var contadores = { productosCreados: 0, productosActualizados: 0,
+    formatosCreados: 0, formatosActualizados: 0 };
+  var ahora = utilNow();
+  var historialEntradas = [];
 
-  var productoId = fila.productoExistente || creadosPorIdentidad[identidad] || null;
-  if (!productoId) {
-    var producto = catalogoCrearProducto_({
-      codigo_producto: datos.codigo_producto,
-      nombre: datos.nombre_producto,
-      categoria: datos.categoria
-    }, origen, usuarioId);
-    productoId = producto.producto_id;
-    creadosPorIdentidad[identidad] = productoId;
-    contadores.productosCreados++;
-  }
-
-  var formato = catalogoCrearFormato_({
-    producto_id: productoId,
-    codigo_barras: datos.codigo_barras,
-    nombre_formato: datos.nombre_formato,
-    tipo_empaque: datos.tipo_empaque,
-    unidades_por_empaque: datos.unidades_por_empaque
-  }, origen, usuarioId);
-  contadores.formatosCreados++;
-
-  if (datos.activo === CONFIG.BOOL.NO) {
-    catalogoCambiarEstado_('FORMATO', formato.formato_id, false, true, origen, usuarioId);
-  }
-}
-
-/** Aplica los cambios detectados de una fila ACTUALIZAR. */
-function importacionAplicarActualizacion_(fila, contadores, origen, usuarioId) {
-  var formato = dbFindOne_('FORMATOS_EMPAQUE', function (f) {
-    return f.codigo_barras === fila.datos.codigo_barras;
+  var filasNuevo = prev.filas.filter(function (f) {
+    return f.estado === CONFIG.ESTADOS_FILA_IMPORT.NUEVO;
   });
-  if (!formato) return; // desapareció entre previsualización y confirmación
+  var filasActualizar = prev.filas.filter(function (f) {
+    return f.estado === CONFIG.ESTADOS_FILA_IMPORT.ACTUALIZAR;
+  });
 
-  var patchFormato = {};
-  var patchProducto = {};
-  fila.cambios.forEach(function (c) {
-    if (c.entidad === 'FORMATO' && c.campo !== 'activo') {
-      patchFormato[c.campo] = c.nuevo;
-    } else if (c.entidad === 'PRODUCTO') {
-      patchProducto[c.campo === 'nombre' ? 'nombre' : c.campo] = c.nuevo;
+  // --- Productos nuevos: una fila por identidad única (codigo_producto o
+  // nombre), aunque varias filas de la planilla compartan el mismo producto
+  // con distintos formatos. ---
+  var identidadAProductoId = {};
+  var productosACrear = [];
+  filasNuevo.forEach(function (fila) {
+    var d = fila.datos;
+    var identidad = d.codigo_producto || d.nombre_producto.toLowerCase();
+    if (fila.productoExistente) {
+      identidadAProductoId[identidad] = fila.productoExistente;
+      return;
     }
+    if (identidadAProductoId[identidad]) return;
+    identidadAProductoId[identidad] = true; // marcado: se resuelve tras generar IDs
+    productosACrear.push({ identidad: identidad, codigo_producto: d.codigo_producto,
+      nombre: d.nombre_producto, categoria: d.categoria });
   });
 
-  var formatoActualizado = false;
-  if (Object.keys(patchFormato).length > 0) {
-    catalogoEditarFormato_(formato.formato_id, patchFormato, origen, usuarioId);
-    formatoActualizado = true;
+  var idsProducto = productosACrear.length
+    ? idNextBatch_('PRODUCTO', productosACrear.length) : [];
+  var filasProductosNuevas = productosACrear.map(function (p, i) {
+    identidadAProductoId[p.identidad] = idsProducto[i];
+    historialEntradas.push({ entidad: 'PRODUCTO', entidad_id: idsProducto[i],
+      campo: 'creacion', valor_anterior: '', valor_nuevo: p.nombre, origen: origen });
+    return { producto_id: idsProducto[i], codigo_producto: p.codigo_producto,
+      nombre: p.nombre, categoria: p.categoria, descripcion: '',
+      activo: CONFIG.BOOL.SI, created_at: ahora, updated_at: ahora };
+  });
+  contadores.productosCreados = productosACrear.length;
+
+  // --- Formatos nuevos: uno por fila NUEVO. ---
+  var idsFormato = filasNuevo.length ? idNextBatch_('FORMATO', filasNuevo.length) : [];
+  var filasFormatosNuevas = filasNuevo.map(function (fila, i) {
+    var d = fila.datos;
+    var identidad = d.codigo_producto || d.nombre_producto.toLowerCase();
+    var productoId = identidadAProductoId[identidad];
+    historialEntradas.push({ entidad: 'FORMATO', entidad_id: idsFormato[i],
+      campo: 'creacion', valor_anterior: '',
+      valor_nuevo: d.nombre_producto + ' / ' + d.nombre_formato + ' (' + d.codigo_barras + ')',
+      origen: origen });
+    return { formato_id: idsFormato[i], producto_id: productoId,
+      codigo_barras: d.codigo_barras, nombre_formato: d.nombre_formato,
+      tipo_empaque: d.tipo_empaque, unidades_por_empaque: utilToInt(d.unidades_por_empaque),
+      activo: d.activo, created_at: ahora, updated_at: ahora };
+  });
+  contadores.formatosCreados = filasNuevo.length;
+
+  if (filasProductosNuevas.length) dbAppendRows_('PRODUCTOS', filasProductosNuevas);
+  if (filasFormatosNuevas.length) dbAppendRows_('FORMATOS_EMPAQUE', filasFormatosNuevas);
+
+  // --- Actualizaciones: reescribir en memoria y subir cada hoja una vez. ---
+  if (filasActualizar.length > 0) {
+    var formatosActuales = dbReadAll_('FORMATOS_EMPAQUE');
+    var formatoPorCodigo = {};
+    formatosActuales.forEach(function (f) { formatoPorCodigo[f.codigo_barras] = f; });
+
+    var productosActuales = dbReadAll_('PRODUCTOS');
+    var productoPorId = {};
+    productosActuales.forEach(function (p) { productoPorId[p.producto_id] = p; });
+
+    var productosModificados = {};
+    var formatosModificados = {};
+
+    filasActualizar.forEach(function (fila) {
+      var formato = formatoPorCodigo[fila.datos.codigo_barras];
+      if (!formato) return; // desapareció entre previsualización y confirmación
+
+      var tocoFormato = false;
+      fila.cambios.forEach(function (c) {
+        var entidadId = c.entidad === 'FORMATO' ? formato.formato_id : formato.producto_id;
+        historialEntradas.push({ entidad: c.entidad, entidad_id: entidadId,
+          campo: c.campo, valor_anterior: c.anterior, valor_nuevo: c.nuevo, origen: origen });
+        if (c.entidad === 'FORMATO') {
+          formato[c.campo] = c.nuevo;
+          tocoFormato = true;
+        } else {
+          var producto = productoPorId[formato.producto_id];
+          if (producto) {
+            producto[c.campo] = c.nuevo;
+            productosModificados[producto.producto_id] = true;
+          }
+        }
+      });
+      if (tocoFormato) {
+        formato.updated_at = ahora;
+        formatosModificados[formato.formato_id] = true;
+      }
+    });
+
+    contadores.formatosActualizados = Object.keys(formatosModificados).length;
+    contadores.productosActualizados = Object.keys(productosModificados).length;
+    Object.keys(productosModificados).forEach(function (pid) {
+      productoPorId[pid].updated_at = ahora;
+    });
+
+    dbWriteAllRows_('FORMATOS_EMPAQUE', formatosActuales);
+    dbWriteAllRows_('PRODUCTOS', productosActuales);
   }
-  var cambioActivo = fila.cambios.filter(function (c) {
-    return c.entidad === 'FORMATO' && c.campo === 'activo';
-  })[0];
-  if (cambioActivo) {
-    catalogoCambiarEstado_('FORMATO', formato.formato_id,
-      cambioActivo.nuevo === CONFIG.BOOL.SI, true, origen, usuarioId);
-    formatoActualizado = true;
+
+  if (historialEntradas.length > 0) {
+    var idsHistorial = idNextBatch_('HISTORIAL', historialEntradas.length);
+    var filasHistorial = historialEntradas.map(function (h, i) {
+      return {
+        historial_id: idsHistorial[i], fecha_hora: ahora, usuario_id: usuarioId,
+        entidad: h.entidad, entidad_id: h.entidad_id, campo: h.campo,
+        valor_anterior: h.valor_anterior === null || h.valor_anterior === undefined
+          ? '' : String(h.valor_anterior),
+        valor_nuevo: h.valor_nuevo === null || h.valor_nuevo === undefined
+          ? '' : String(h.valor_nuevo),
+        origen: h.origen
+      };
+    });
+    dbAppendRows_('HISTORIAL_CATALOGO', filasHistorial);
   }
-  if (formatoActualizado) contadores.formatosActualizados++;
-  if (Object.keys(patchProducto).length > 0) {
-    catalogoEditarProducto_(formato.producto_id, patchProducto, origen, usuarioId);
-    contadores.productosActualizados++;
-  }
+
+  return contadores;
 }
 
 /** Resultado de previsualización con error de estructura. */
