@@ -134,6 +134,20 @@
     window.Sesion.cerrar();
   });
 
+  // ------------------- teclado móvil: ocultar al tocar fuera ---------------
+  // Tocar un campo despliega el teclado (comportamiento nativo). Tocar
+  // CUALQUIER otra parte de la pantalla quita el foco del campo activo, lo
+  // que esconde el teclado. Los campos con data-mantener-foco (p. ej. el
+  // campo de la pistola en el ingreso) quedan exentos.
+  document.addEventListener('touchstart', function (ev) {
+    var activo = document.activeElement;
+    if (!activo || !/^(INPUT|TEXTAREA|SELECT)$/.test(activo.tagName)) return;
+    if (activo.hasAttribute('data-mantener-foco')) return;
+    var destino = ev.target;
+    if (destino.closest && destino.closest('input, textarea, select, label')) return;
+    activo.blur();
+  }, { passive: true });
+
   // ----------------------------- API pública -------------------------------
   window.Sesion = {
     /** Garantiza sesión válida (y rol, si se exige) antes de ejecutar onListo. */

@@ -18,8 +18,10 @@
   main { max-width: 980px; margin: 0 auto; padding: 1rem 1.2rem 3rem; }
 
   .panel { background: #fff; border: 1px solid var(--borde); border-radius: 8px;
-    padding: 1rem; margin-bottom: 1rem; }
+    padding: 1rem; margin-bottom: 1rem; overflow-x: auto; }
   .panel h2 { margin: 0 0 .8rem; font-size: 1.02rem; color: var(--marron); }
+  /* La tabla del carro se desplaza horizontalmente en pantallas chicas. */
+  #tabla-carro { min-width: 560px; }
 
   /* Campo de escaneo: grande, siempre visible y siempre enfocado. */
   #escaneo { width: 100%; font-size: 1.35rem; padding: .8rem 1rem;
@@ -54,6 +56,16 @@
   #resultado .cajaok { background: #e8f5e9; border: 1px solid var(--ok); color: var(--ok);
     border-radius: 8px; padding: 1rem; font-size: 1rem; white-space: pre-wrap; }
   .muted { color: var(--gris); font-size: .85rem; }
+
+  /* Ajustes táctiles para pantallas chicas */
+  @media (max-width: 640px) {
+    main { padding: .8rem .6rem 3rem; }
+    header { flex-wrap: wrap; gap: .4rem; }
+    header h1 { font-size: 1rem; }
+    #escaneo { font-size: 1.1rem; }
+    button.accion { padding: .55rem .8rem; }
+    th, td { padding: .55rem .5rem; }
+  }
 </style>
 </head>
 <body>
@@ -70,7 +82,7 @@
 <main>
   <div class="panel">
     <h2>Escanear con la pistola</h2>
-    <input id="escaneo" autocomplete="off"
+    <input id="escaneo" autocomplete="off" data-mantener-foco
       placeholder="Escanea una caja o display… (el cursor debe estar aquí)">
     <div id="estado-escaneo" class="muted">Listo para escanear. Cada lectura agrega
       1 empaque; volver a escanear el mismo código suma otro.</div>
@@ -96,7 +108,7 @@
       <input id="observacion" placeholder="p. ej. entrega proveedor Lácteos Sur, guía 4581">
     </label>
 
-    <div style="display:flex;gap:.8rem;align-items:center;margin-top:.6rem">
+    <div style="display:flex;gap:.8rem;align-items:center;margin-top:.6rem;flex-wrap:wrap">
       <button class="primario" id="btn-confirmar" disabled onclick="confirmarIngreso()">
         CONFIRMAR INGRESO</button>
       <button class="secundario" onclick="cancelarIngreso()">Cancelar y vaciar</button>

@@ -26,8 +26,11 @@
   section.tab.activa { display: block; }
 
   .panel { background: #fff; border: 1px solid var(--borde); border-radius: 8px;
-    padding: 1rem; margin-bottom: 1rem; }
+    padding: 1rem; margin-bottom: 1rem; overflow-x: auto; }
   .panel h2 { margin: 0 0 .8rem; font-size: 1.02rem; color: var(--marron); }
+  /* Las tablas anchas se desplazan horizontalmente dentro de su panel en
+     vez de aplastarse en pantallas chicas. */
+  .panel table { min-width: 640px; }
 
   .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
     gap: .8rem; margin-bottom: 1rem; }
@@ -70,6 +73,17 @@
   .muted { color: var(--gris); font-size: .85rem; }
   input.buscar { width: 100%; padding: .5rem; border: 1px solid var(--borde);
     border-radius: 6px; margin-bottom: .7rem; }
+
+  /* Ajustes táctiles para pantallas chicas */
+  @media (max-width: 640px) {
+    main { padding: .8rem .6rem 3rem; }
+    header h1 { font-size: 1rem; }
+    header nav a { margin-left: .6rem; }
+    button.accion { padding: .55rem .8rem; }
+    .filtros input, .filtros select { font-size: 1rem; padding: .55rem; }
+    th, td { padding: .55rem .5rem; }
+    #detalle-mov .caja { padding: .8rem; }
+  }
 </style>
 </head>
 <body>

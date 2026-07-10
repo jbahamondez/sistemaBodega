@@ -16,7 +16,7 @@
   header h1 { margin: 0; font-size: 1.15rem; font-weight: 600; }
   main { max-width: 1080px; margin: 0 auto; padding: 1rem 1.2rem 3rem; }
 
-  .tabs { display: flex; gap: .4rem; margin: 1rem 0; }
+  .tabs { display: flex; gap: .4rem; margin: 1rem 0; flex-wrap: wrap; }
   .tabs button { border: 1px solid var(--borde); background: #fff; padding: .55rem 1.1rem;
     border-radius: 8px 8px 0 0; cursor: pointer; font-size: .95rem; }
   .tabs button.activa { background: var(--marron); color: #fff; border-color: var(--marron); }
@@ -25,8 +25,10 @@
   section.tab.activa { display: block; }
 
   .panel { background: #fff; border: 1px solid var(--borde); border-radius: 8px;
-    padding: 1rem; margin-bottom: 1rem; }
+    padding: 1rem; margin-bottom: 1rem; overflow-x: auto; }
   .panel h2 { margin: 0 0 .8rem; font-size: 1.02rem; color: var(--marron); }
+  /* Tablas anchas: desplazamiento horizontal en pantallas chicas. */
+  .panel table { min-width: 640px; }
 
   table { width: 100%; border-collapse: collapse; font-size: .88rem; }
   th, td { text-align: left; padding: .45rem .5rem; border-bottom: 1px solid var(--borde); }
@@ -76,6 +78,17 @@
   ul.instrucciones { font-size: .85rem; color: #444; padding-left: 1.2rem; }
   ul.instrucciones li { margin-bottom: .25rem; }
   .cargando { opacity: .5; pointer-events: none; }
+
+  /* Ajustes táctiles para pantallas chicas */
+  @media (max-width: 640px) {
+    main { padding: .8rem .6rem 3rem; }
+    header h1 { font-size: 1rem; }
+    button.accion { padding: .55rem .8rem; }
+    button.primario { padding: .7rem 1.1rem; }
+    form.editor input, form.editor select { font-size: 1rem; padding: .55rem; }
+    th, td { padding: .55rem .5rem; }
+    #aviso { left: .8rem; max-width: none; }
+  }
 </style>
 </head>
 <body>
