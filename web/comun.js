@@ -113,6 +113,53 @@
     pendiente.onListo(datos);
   }
 
+  /**
+   * Confirma la sesión con el servidor (rol vigente) y actualiza `datos` +
+   * el respaldo en localStorage. Sin efectos de UI: quien la llama decide
+   * qué mostrar. onOk() se invoca con `datos` ya actualizado; onErr(mensaje)
+   * solo cuando corresponde limpiar la sesión o avisar de un problema real
+   * (nunca por un simple corte de red, D-025).
+   */
+  function confirmarConServidor(token, onOk, onErr) {
+    llamarServidor('apiSesionInfo', [token], function (info) {
+      datos = { token: token, usuario_id: info.usuario_id,
+        nombre: info.nombre, rol: info.rol, validada: Date.now() };
+      guardar(datos);
+      onOk();
+    }, function (err) {
+      var msg = (err && err.message) || '';
+      if (msg.indexOf('Sesión expirada') !== -1 || msg.indexOf('inactivo') !== -1) {
+        guardar(null);
+        onErr('La sesión expiró. Vuelve a entrar.');
+      } else {
+        onErr('No se pudo verificar tu acceso (' + msg + '). ' +
+          'Revisa tu conexión y recarga la página.');
+      }
+    });
+  }
+
+  /**
+   * Overlay "verificando…" para asegurarRolConfirmado: evita mostrar la
+   * página en blanco mientras se confirma el rol con el servidor.
+   */
+  function mostrarVerificando() {
+    var el = document.getElementById('sesion-overlay');
+    el.style.display = 'flex';
+    document.getElementById('sesion-form').style.display = 'none';
+    if (!document.getElementById('sesion-verificando')) {
+      document.querySelector('#sesion-overlay .caja').insertAdjacentHTML('beforeend',
+        '<p id="sesion-verificando" style="text-align:center;color:#757575;' +
+        'font-size:.9rem;margin:0">Verificando acceso…</p>');
+    }
+    document.getElementById('sesion-verificando').style.display = 'block';
+    document.getElementById('sesion-chip').style.display = 'none';
+  }
+  function ocultarVerificando() {
+    document.getElementById('sesion-form').style.display = '';
+    var v = document.getElementById('sesion-verificando');
+    if (v) v.style.display = 'none';
+  }
+
   document.getElementById('sesion-form').addEventListener('submit', function (ev) {
     ev.preventDefault();
     var boton = document.getElementById('sesion-boton');
@@ -181,6 +228,46 @@
           mostrarLogin('La sesión expiró. Vuelve a entrar.');
         }
       });
+    },
+
+    /**
+     * Verificación de rol SIN optimismo: nunca decide con el dato guardado
+     * en el navegador (podría estar desactualizado, p. ej. si el rol
+     * cambió después de iniciar sesión, o si el dispositivo se usó antes
+     * con otra cuenta). Muestra "Verificando acceso…" y confirma con el
+     * servidor antes de mostrar la página o el aviso de "no autorizado" —
+     * una sola decisión, sin destello de contenido indebido. USA ESTO en
+     * pantallas ENTERAS restringidas por rol (Panel, Catálogo, Ingreso):
+     * si el rol confirmado no coincide, la página completa se rechaza.
+     */
+    asegurarRolConfirmado: function (rolRequerido, onListo) {
+      pendiente = { rolRequerido: rolRequerido, onListo: onListo };
+      var guardada = leer();
+      if (!guardada || !guardada.token) { mostrarLogin(''); return; }
+      mostrarVerificando();
+      confirmarConServidor(guardada.token, function () {
+        ocultarVerificando();
+        completar();
+      }, function (mensaje) {
+        ocultarVerificando();
+        mostrarLogin(mensaje);
+      });
+    },
+
+    /**
+     * Verificación de rol SIN efectos en la UI de sesión (sin overlay, sin
+     * mensajes de error): confirma con el servidor y ejecuta onEsRol() SOLO
+     * si el rol confirmado coincide; si no coincide o falla, simplemente no
+     * hace nada. USA ESTO para decisiones parciales dentro de una página
+     * abierta a cualquier rol (p. ej. mostrar accesos de administración en
+     * el inicio) — nunca para bloquear la página completa.
+     */
+    confirmarRolPara: function (rolBuscado, onEsRol) {
+      var guardada = leer();
+      if (!guardada || !guardada.token) return;
+      confirmarConServidor(guardada.token, function () {
+        if (datos.rol === rolBuscado) onEsRol();
+      }, function () { /* silencioso: no se muestra ni se decide nada */ });
     },
 
     /** Llama a una función api* anteponiendo el token de la sesión. */

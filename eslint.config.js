@@ -222,7 +222,8 @@ module.exports = [
         API_URL: 'readonly',
         Sesion: 'readonly',
         Ui: 'readonly',
-        clearTimeout: 'readonly'
+        clearTimeout: 'readonly',
+        setInterval: 'readonly'
       }
     },
     rules: {

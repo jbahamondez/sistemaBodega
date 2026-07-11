@@ -366,7 +366,7 @@ function nuevoIngreso() {
 
 document.getElementById('observacion').addEventListener('change', guardarBorrador);
 // El ingreso es exclusivo de jefatura (§12.4); el servidor lo revalida.
-Sesion.asegurar('JEFATURA', function () {
+Sesion.asegurarRolConfirmado('JEFATURA', function () {
   restaurarBorrador();
   renderCarro();
   reenfocar();

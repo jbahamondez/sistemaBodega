@@ -611,7 +611,7 @@ function cargarHistorial() {
 // Solo jefatura puede administrar el catálogo (§12.4); el servidor lo
 // revalida en cada llamada. Las instrucciones de la plantilla están
 // embebidas en el HTML (sin viaje al servidor).
-Sesion.asegurar('JEFATURA', function () {
+Sesion.asegurarRolConfirmado('JEFATURA', function () {
   cargarCatalogo();
 });
 </script>

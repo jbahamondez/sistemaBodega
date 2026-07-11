@@ -549,7 +549,7 @@ function cargarTrazabilidad() {
 
 // -------------------------------- arranque ---------------------------------
 // El panel es exclusivo de jefatura (§12.4); el servidor revalida cada llamada.
-Sesion.asegurar('JEFATURA', function () {
+Sesion.asegurarRolConfirmado('JEFATURA', function () {
   cargarInicial();
 });
 </script>
