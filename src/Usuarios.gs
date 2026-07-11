@@ -46,26 +46,28 @@ function usuarioCrear_(datos) {
   }
   if (pin.length < 6) throw new Error('El PIN debe tener al menos 6 dígitos.');
 
-  if (usuarioIdentificadorEnUso_(identificador, null)) {
-    throw new Error('Ya existe un usuario con identificador "' + identificador + '".');
-  }
+  return dbConLock_(function () { // unicidad + escritura atómicas (A5)
+    if (usuarioIdentificadorEnUso_(identificador, null)) {
+      throw new Error('Ya existe un usuario con identificador "' + identificador + '".');
+    }
 
-  var salt = utilGenerateSalt();
-  var ahora = utilNow();
-  var usuario = {
-    usuario_id: idNext_('USUARIO'),
-    nombre: nombre,
-    identificador_acceso: identificador,
-    rol: rol,
-    pin_hash: utilHashPin(pin, salt),
-    pin_salt: salt,
-    activo: CONFIG.BOOL.SI,
-    created_at: ahora,
-    updated_at: ahora
-  };
-  dbAppendRow_('USUARIOS', usuario);
-  return { usuario_id: usuario.usuario_id, nombre: nombre,
-    identificador_acceso: identificador, rol: rol };
+    var salt = utilGenerateSalt();
+    var ahora = utilNow();
+    var usuario = {
+      usuario_id: idNext_('USUARIO'),
+      nombre: nombre,
+      identificador_acceso: identificador,
+      rol: rol,
+      pin_hash: utilHashPin(pin, salt),
+      pin_salt: salt,
+      activo: CONFIG.BOOL.SI,
+      created_at: ahora,
+      updated_at: ahora
+    };
+    dbAppendRow_('USUARIOS', usuario);
+    return { usuario_id: usuario.usuario_id, nombre: nombre,
+      identificador_acceso: identificador, rol: rol };
+  });
 }
 
 /** Edita nombre y/o identificador de acceso de un usuario. */

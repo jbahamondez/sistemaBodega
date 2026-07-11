@@ -171,7 +171,8 @@ function runMovimientoTests() {
   var tests = [testMovimientosCasos_, testAuthYPermisos_,
     testCorreccionCaso6_, testImportacionCasos_, testHttpRouter_,
     testPlanillaRealChocolateria_, testGestionUsuarios_, testEstadoLote_,
-    testIdempotencia_, testFormulaInjection_];
+    testIdempotencia_, testFormulaInjection_,
+    testAjusteReversa_, testMovLimite_, testPendientesAntiguos_];
   tests.forEach(function (t) {
     try {
       t();
@@ -793,6 +794,80 @@ function testFormulaInjection_() {
   var fila = dbFindById_('PRODUCTOS', maligno.producto_id);
   assert_(fila.nombre === '=IMPORTRANGE("x","y")',
     'A1: el nombre con "=" se guarda y lee como texto literal, sin evaluarse');
+}
+
+/**
+ * A4: ajuste manual y reversa a través de la capa Api. El ajuste suma/resta
+ * stock con motivo obligatorio; la reversa deshace un movimiento con las
+ * cantidades opuestas, sin tocar el original.
+ */
+function testAjusteReversa_() {
+  var sesion = apiLogin('jefa.test', '123456');
+  var producto = catalogoCrearProducto_({ nombre: 'AJU Producto', codigo_producto: 'AJU-1' });
+  catalogoCrearFormato_({ producto_id: producto.producto_id, codigo_barras: 'AJU-CB-1',
+    nombre_formato: 'Caja', tipo_empaque: 'CAJA', unidades_por_empaque: 12 });
+
+  // Ajuste +5 cajas = +60 unidades.
+  apiAjusteConfirmar(sesion.token, { tipo: 'AJUSTE', observacion: 'conteo inicial',
+    claveIdempotencia: 'aju-1', items: [{ codigo_barras: 'AJU-CB-1', cantidad_empaques: 5 }] });
+  assert_(invGetStock_(producto.producto_id) === 60, 'A4: ajuste +5 cajas → 60 unidades');
+
+  // El motivo es obligatorio.
+  var sinMotivo = false;
+  try {
+    apiAjusteConfirmar(sesion.token, { tipo: 'AJUSTE', observacion: '',
+      items: [{ codigo_barras: 'AJU-CB-1', cantidad_empaques: 1 }] });
+  } catch (e) { sinMotivo = e.message.indexOf('motivo') !== -1; }
+  assert_(sinMotivo, 'A4: el ajuste exige motivo');
+
+  // Reversa de un retiro: retirar 2 cajas (−24), luego revertir SUMANDO 24.
+  // El panel calcula la cantidad opuesta a las unidades guardadas; como el
+  // retiro guarda −24, la reversa envía +2 cajas (delta +24).
+  var retiro = movConfirmar_({ tipo: 'RETIRO', usuarioNombre: 'Test',
+    items: [{ codigo_barras: 'AJU-CB-1', cantidad_empaques: 2 }] });
+  assert_(invGetStock_(producto.producto_id) === 36, 'A4: retiro deja 36');
+  apiAjusteConfirmar(sesion.token, { tipo: 'REVERSA',
+    observacion: 'Reversa de ' + retiro.movimiento_id,
+    claveIdempotencia: 'rev-1',
+    items: [{ codigo_barras: 'AJU-CB-1', cantidad_empaques: 2 }] });
+  assert_(invGetStock_(producto.producto_id) === 60,
+    'A4: la reversa devuelve el stock a 60 sin tocar el retiro original');
+  assert_(movObtenerDetalle_(retiro.movimiento_id).cabecera.estado === 'CONFIRMADO',
+    'A4: el movimiento original permanece intacto');
+}
+
+/** A6: movListar_ respeta el límite (no devuelve todo el historial). */
+function testMovLimite_() {
+  var producto = catalogoCrearProducto_({ nombre: 'LIM Producto', codigo_producto: 'LIM-1' });
+  catalogoCrearFormato_({ producto_id: producto.producto_id, codigo_barras: 'LIM-CB-1',
+    nombre_formato: 'U', tipo_empaque: 'UNIDAD', unidades_por_empaque: 1 });
+  for (var i = 0; i < 6; i++) {
+    movConfirmar_({ tipo: 'ENTRADA', usuarioNombre: 'Test',
+      items: [{ codigo_barras: 'LIM-CB-1', cantidad_empaques: 1 }] });
+  }
+  var acotado = movListar_({ productoId: producto.producto_id, limite: 3 });
+  assert_(acotado.length === 3, 'A6: movListar_ respeta el límite explícito');
+  var todos = movListar_({ productoId: producto.producto_id });
+  assert_(todos.length === 6, 'A6: sin límite explícito trae los 6 (bajo el tope de 200)');
+}
+
+/**
+ * M3: movPendientesAntiguos_ detecta cabeceras EN_PROCESO viejas (fallo
+ * parcial) y no confunde a las CONFIRMADAS.
+ */
+function testPendientesAntiguos_() {
+  // Cabecera EN_PROCESO simulada con fecha antigua, escrita directo.
+  dbAppendRow_('MOVIMIENTOS', {
+    movimiento_id: 'MOV-HUERFANO-1', tipo: 'RETIRO', estado: 'EN_PROCESO',
+    usuario_id: 'USR-X', usuario_nombre_snapshot: 'X', fecha_hora: '2000-01-01 00:00:00',
+    origen: 'BODEGA', destino: 'TIENDA', observacion: '', total_formatos: 0,
+    total_empaques: 0, total_unidades: 0, clave_idempotencia: '' });
+  var pendientes = movPendientesAntiguos_(10);
+  var ids = pendientes.map(function (m) { return m.movimiento_id; });
+  assert_(ids.indexOf('MOV-HUERFANO-1') !== -1,
+    'M3: detecta el EN_PROCESO antiguo');
+  assert_(pendientes.every(function (m) { return m.estado === 'EN_PROCESO'; }),
+    'M3: solo reporta EN_PROCESO, nunca CONFIRMADO');
 }
 
 /** Integración: requiere setupDatabase() ejecutado. Se omite si no lo está. */

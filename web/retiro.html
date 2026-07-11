@@ -320,6 +320,10 @@ function cargarZXing() {
   if (window.ZXing) { iniciarZXing(); return; }
   var s = document.createElement('script');
   s.src = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
+  // SRI (M9): si el CDN o el paquete se alteraran, el navegador bloquea el
+  // script en vez de ejecutar código no verificado en el móvil del trabajador.
+  s.integrity = 'sha384-BzBxP10ZE72aitqj5UMmUsbKFliP/DZqA8Wq+BNNhlIJDGoEd1tpkMYXOg9+n6sB';
+  s.crossOrigin = 'anonymous';
   s.onload = iniciarZXing;
   s.onerror = function () {
     mensaje('No se pudo cargar el lector de códigos (¿sin internet?). ' +

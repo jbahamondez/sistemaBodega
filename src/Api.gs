@@ -96,6 +96,7 @@ function apiAjusteConfirmar(token, datos) {
     origen: 'BODEGA',
     destino: 'BODEGA',
     observacion: datos.observacion,
+    claveIdempotencia: datos.claveIdempotencia,
     items: datos.items
   });
 }

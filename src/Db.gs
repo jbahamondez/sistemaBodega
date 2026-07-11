@@ -6,6 +6,24 @@
  * columna definidos en CONFIG.SHEETS.
  */
 
+/**
+ * Ejecuta una función bajo el bloqueo global del script (auditoría A5).
+ * Para operaciones que verifican unicidad y luego escriben (crear producto,
+ * formato o usuario): sin bloqueo, dos creaciones simultáneas del mismo
+ * código podrían pasar ambas la verificación antes de que la otra escriba.
+ */
+function dbConLock_(fn) {
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(CONFIG.LOCK_TIMEOUT_MS)) {
+    throw new Error('El sistema está procesando otra operación. Intenta nuevamente.');
+  }
+  try {
+    return fn();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 /** Abre el spreadsheet configurado. Falla con mensaje claro si no existe. */
 function dbGetSpreadsheet_() {
   var id = PropertiesService.getScriptProperties()

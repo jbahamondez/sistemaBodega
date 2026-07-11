@@ -1,34 +1,32 @@
 /**
- * Code.gs — Punto de entrada GET: página de estado del backend.
+ * Code.gs — Punto de entrada GET del backend.
  *
  * Desde la migración a GitHub Pages (D-022), las pantallas viven en el
- * frontend estático (carpeta web/ del repositorio) y este servicio actúa
- * solo como API JSON (Http.gs). doGet queda como verificación rápida de
- * salud del backend.
+ * frontend estático (carpeta web/) y este servicio actúa solo como API JSON
+ * (Http.gs). doGet devuelve una página NEUTRA: el endpoint es público y
+ * anónimo, así que no debe divulgar estado interno ni conteos (auditoría
+ * M8). La verificación de salud real se hace desde el editor de Apps Script
+ * (menú Ejecuciones) o ejecutando codeEstadoFundacion_ manualmente.
  */
 
 function doGet() {
-  var estado = codeEstadoFundacion_();
   var html = HtmlService.createHtmlOutput(
     '<!DOCTYPE html><html><head><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width, initial-scale=1">' +
-    '<title>Sistema Bodega — API</title></head>' +
+    '<title>Sistema Bodega</title></head>' +
     '<body style="font-family:sans-serif;max-width:640px;margin:2rem auto;padding:0 1rem">' +
-    '<h1>Sistema Bodega — Backend</h1>' +
-    '<p>Este servicio es la API del sistema. Las pantallas están en el ' +
-    'sitio del frontend (GitHub Pages).</p>' +
-    '<ul>' +
-    '<li>Base de datos configurada: ' + (estado.baseDatosConfigurada ? 'Sí' : 'No — ejecutar setupDatabase()') + '</li>' +
-    '<li>Hojas del modelo: ' + estado.hojasExistentes + ' de ' + estado.hojasEsperadas + '</li>' +
-    '<li>Usuarios registrados: ' + estado.usuarios + '</li>' +
-    '</ul>' +
+    '<h1>Sistema Bodega</h1>' +
+    '<p>Servicio en funcionamiento. Accede al sistema desde la aplicación web.</p>' +
     '</body></html>'
   );
-  html.setTitle('Sistema Bodega — API');
+  html.setTitle('Sistema Bodega');
   return html;
 }
 
-/** Estado interno de la fundación, tolerante a base de datos no configurada. */
+/**
+ * Estado interno de la fundación (para diagnóstico manual desde el editor,
+ * NO expuesto por HTTP). Tolerante a base de datos no configurada.
+ */
 function codeEstadoFundacion_() {
   var estado = {
     baseDatosConfigurada: false,
@@ -44,7 +42,8 @@ function codeEstadoFundacion_() {
     });
     estado.usuarios = dbReadAll_('USUARIOS').length;
   } catch (err) {
-    // Sin configurar: la página de estado lo informa.
+    // Sin configurar: el diagnóstico manual lo informa.
   }
+  Logger.log(JSON.stringify(estado, null, 2));
   return estado;
 }

@@ -1,0 +1,22 @@
+name: CI — lint, sintaxis y pruebas
+
+# Corre la batería completa (ESLint + sintaxis V8 + pruebas en el entorno
+# simulado de Apps Script) en cada push y PR, para que una regresión no
+# llegue a main/producción sin ser detectada (auditoría M6).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm ci
+      - run: npm run check

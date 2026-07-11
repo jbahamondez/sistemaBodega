@@ -30,6 +30,13 @@ function panelDashboard_(inventarioYaLeido) {
     stock_total_unidades: stockTotal,
     productos_sin_stock: sinStock,
     productos_bajo_minimo: bajoMinimo,
-    ultimos_movimientos: movListar_({}).slice(0, 10)
+    // Fallos parciales de confirmación (M3): cabeceras EN_PROCESO con más
+    // de 10 minutos. Normalmente vacío; si aparece algo, hubo un error a
+    // mitad de escritura y conviene revisar/reconciliar ese movimiento.
+    movimientos_en_proceso: movPendientesAntiguos_(10).map(function (m) {
+      return { movimiento_id: m.movimiento_id, tipo: m.tipo,
+        fecha_hora: m.fecha_hora, usuario: m.usuario_nombre_snapshot };
+    }),
+    ultimos_movimientos: movListar_({ limite: 10 })
   };
 }

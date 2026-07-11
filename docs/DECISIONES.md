@@ -324,3 +324,59 @@ agregado a `scripts/entorno-gas.js`, exclusivamente desde
 `scripts/run-tests.js` — para que `runFoundationTests()`/
 `runMovimientoTests()` sigan siendo 100% seguras de ejecutar contra
 producción sin crear ni borrar archivos reales por accidente.
+
+## D-029 — Remediación de auditoría (HACER AHORA + HACER PRONTO)
+
+Tras la auditoría integral, se implementaron los hallazgos priorizados como
+"hacer ahora" y "hacer pronto":
+
+**Seguridad**
+- **C1 — Fuerza bruta:** `authLogin_` bloquea un identificador tras 5 fallos
+  consecutivos por 15 min (contador en Script Properties, aplicado también a
+  identificadores inexistentes para no revelar cuáles existen). PIN mínimo
+  subido de 4 a 6 dígitos en creación, edición y reset.
+- **A1 — Formula injection:** toda fila escrita se formatea como texto (`@`)
+  con `dbFormatearRangoTexto_` antes del `setValues`, así Sheets nunca evalúa
+  un valor que empiece con `=`/`+`/`-`/`@`.
+- **M8 — Divulgación:** `doGet` devuelve una página neutra; el estado interno
+  (conteos, hojas) solo se ve por diagnóstico manual en el editor.
+- **M9 — Cadena de suministro:** el `<script>` de ZXing por CDN lleva
+  `integrity` (SHA-384) + `crossorigin`.
+
+**Integridad de datos**
+- **C2 — Idempotencia:** cada carro genera una `claveIdempotencia` (UUID) que
+  viaja en la confirmación y se guarda en la cabecera (columna nueva
+  `clave_idempotencia`). `movConfirmar_` la verifica DENTRO del lock: un
+  reintento tras corte de red devuelve el movimiento ya confirmado en vez de
+  duplicarlo.
+- **A3 — Formato texto en todas las filas:** el formateo `@` por rango escrito
+  (no solo las ~1000 filas iniciales del grid) preserva ceros iniciales de
+  códigos y snapshots sin importar cuánto crezca la hoja.
+- **A5 — Carreras en creación:** `catalogoCrearProducto_`,
+  `catalogoCrearFormato_` y `usuarioCrear_` corren bajo `dbConLock_`
+  (verificación de unicidad + escritura atómicas).
+
+**Funcionalidad y operación**
+- **A4 — Ajustes/Reversa:** nueva pestaña "Ajustes" en el panel (ajuste
+  manual con motivo obligatorio) y botón "Revertir movimiento" en el detalle;
+  ambos usan `apiAjusteConfirmar` (AJUSTE/REVERSA), cerrando el ciclo de
+  corrección del Caso 6 desde la interfaz.
+- **A6 — Listados acotados:** `movListar_` limita a 200 por defecto; el panel
+  avisa cuando el resultado llega al tope y sugiere filtrar.
+- **M3 — Fallos parciales visibles:** el dashboard alerta de cabeceras
+  `EN_PROCESO` con más de 10 min (`movPendientesAntiguos_`), que antes
+  quedaban invisibles.
+- **M5 — Timeout de red:** `llamarServidor` corta a los 30 s con
+  `AbortController` y mensaje accionable, en vez de "Procesando…" eterno.
+- **M6 — CI:** workflow `ci.yml` corre `npm run check` (lint + sintaxis + 32
+  pruebas) en cada push y PR.
+- **M7 — Restauración:** runbook en `docs/RESTAURACION.md`.
+
+**A2** (escape de comilla simple / onclick con solo IDs) se resolvió en el
+lote HACER AHORA migrando los botones de usuario a pasar únicamente el ID.
+
+Nota de migración: la columna `clave_idempotencia` se agregó al esquema de
+Movimientos. La hoja de producción existente necesita el encabezado nuevo en
+la celda correspondiente (ver mensaje de despliegue); las lecturas/escrituras
+son posicionales, así que la idempotencia funciona igual, pero el encabezado
+debe añadirse para mantener `setupDatabase()` reejecutable.

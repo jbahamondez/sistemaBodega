@@ -267,13 +267,21 @@ function movResolverItem_(item, tipo, posicion) {
   };
 }
 
+/** Tope por defecto de movimientos devueltos (auditoría A6). */
+var MOV_LIMITE_DEFAULT = 200;
+
 /**
  * Lista movimientos CONFIRMADOS, más recientes primero, con filtros
- * opcionales: { tipo, usuarioId, productoId, desde, hasta } (fechas
- * 'yyyy-MM-dd').
+ * opcionales: { tipo, usuarioId, productoId, desde, hasta, limite } (fechas
+ * 'yyyy-MM-dd'). Siempre acotado: sin `limite` explícito se devuelven como
+ * máximo MOV_LIMITE_DEFAULT — el historial crece para siempre y una consulta
+ * sin filtros no debe arrastrar todo (A6). El cliente detecta el truncado
+ * comparando length === limite y avisa "mostrando los N más recientes".
  */
 function movListar_(filtros) {
   filtros = filtros || {};
+  var limite = utilToInt(filtros.limite);
+  if (limite === null || limite <= 0) limite = MOV_LIMITE_DEFAULT;
 
   var conProducto = null;
   if (filtros.productoId) {
@@ -294,7 +302,23 @@ function movListar_(filtros) {
       if (filtros.hasta && fecha > filtros.hasta) return false;
       return true;
     })
-    .reverse();
+    .reverse()
+    .slice(0, limite);
+}
+
+/**
+ * Movimientos EN_PROCESO con más antigüedad que `minutos` (auditoría M3):
+ * un fallo intermedio en la confirmación los deja así por diseño (D-005),
+ * pero nadie los ve porque movListar_ los filtra. El dashboard los reporta
+ * para que jefatura sepa que hubo un fallo parcial y pueda reconciliar.
+ */
+function movPendientesAntiguos_(minutos) {
+  var limiteMs = Date.now() - (minutos || 10) * 60 * 1000;
+  return dbReadAll_('MOVIMIENTOS').filter(function (m) {
+    if (m.estado !== CONFIG.ESTADOS_MOVIMIENTO.EN_PROCESO) return false;
+    var t = new Date(m.fecha_hora.replace(' ', 'T')).getTime();
+    return isNaN(t) ? true : t < limiteMs; // fecha ilegible: también reportar
+  });
 }
 
 /** Cabecera + detalles de un movimiento específico. */

@@ -46,7 +46,7 @@ function catalogoListar_() {
   });
 }
 
-/** Crea un producto. Devuelve el producto creado. */
+/** Crea un producto. Devuelve el producto creado. Bajo lock (A5). */
 function catalogoCrearProducto_(datos, origen, usuarioId) {
   origen = origen || CONFIG.ORIGENES_CAMBIO.EDICION_MANUAL;
   usuarioId = usuarioId || CONFIG.USUARIO_PENDIENTE_AUTH;
@@ -54,32 +54,34 @@ function catalogoCrearProducto_(datos, origen, usuarioId) {
   var nombre = valRequireNonEmpty(datos.nombre, 'nombre del producto');
   var codigoProducto = utilTrim(datos.codigo_producto);
 
-  if (codigoProducto) {
-    var existente = dbFindOne_('PRODUCTOS', function (p) {
-      return p.codigo_producto === codigoProducto;
-    });
-    if (existente) {
-      throw new Error(
-        'Ya existe un producto con código "' + codigoProducto + '" (' +
-        existente.nombre + ').');
+  return dbConLock_(function () {
+    if (codigoProducto) {
+      var existente = dbFindOne_('PRODUCTOS', function (p) {
+        return p.codigo_producto === codigoProducto;
+      });
+      if (existente) {
+        throw new Error(
+          'Ya existe un producto con código "' + codigoProducto + '" (' +
+          existente.nombre + ').');
+      }
     }
-  }
 
-  var ahora = utilNow();
-  var producto = {
-    producto_id: idNext_('PRODUCTO'),
-    codigo_producto: codigoProducto,
-    nombre: nombre,
-    categoria: utilTrim(datos.categoria),
-    descripcion: utilTrim(datos.descripcion),
-    activo: CONFIG.BOOL.SI,
-    created_at: ahora,
-    updated_at: ahora
-  };
-  dbAppendRow_('PRODUCTOS', producto);
-  histRegistrar_(usuarioId, 'PRODUCTO', producto.producto_id, 'creacion', '',
-    producto.nombre, origen);
-  return producto;
+    var ahora = utilNow();
+    var producto = {
+      producto_id: idNext_('PRODUCTO'),
+      codigo_producto: codigoProducto,
+      nombre: nombre,
+      categoria: utilTrim(datos.categoria),
+      descripcion: utilTrim(datos.descripcion),
+      activo: CONFIG.BOOL.SI,
+      created_at: ahora,
+      updated_at: ahora
+    };
+    dbAppendRow_('PRODUCTOS', producto);
+    histRegistrar_(usuarioId, 'PRODUCTO', producto.producto_id, 'creacion', '',
+      producto.nombre, origen);
+    return producto;
+  });
 }
 
 /** Edita campos de un producto existente. El stock nunca se toca (§8.9). */
@@ -120,13 +122,10 @@ function catalogoEditarProducto_(productoId, patch, origen, usuarioId) {
   return dbFindById_('PRODUCTOS', productoId);
 }
 
-/** Crea un formato de empaque para un producto existente. */
+/** Crea un formato de empaque para un producto existente. Bajo lock (A5). */
 function catalogoCrearFormato_(datos, origen, usuarioId) {
   origen = origen || CONFIG.ORIGENES_CAMBIO.EDICION_MANUAL;
   usuarioId = usuarioId || CONFIG.USUARIO_PENDIENTE_AUTH;
-
-  var producto = dbFindById_('PRODUCTOS', utilTrim(datos.producto_id));
-  if (!producto) throw new Error('Producto no encontrado: ' + datos.producto_id);
 
   var codigoBarras = utilNormalizeBarcode(datos.codigo_barras);
   if (!valIsCodigoBarras(codigoBarras)) {
@@ -139,25 +138,30 @@ function catalogoCrearFormato_(datos, origen, usuarioId) {
       '". Válidos: ' + Object.keys(CONFIG.TIPOS_EMPAQUE).join(', '));
   }
   var unidades = valRequirePositiveInt(datos.unidades_por_empaque, 'unidades por empaque');
-  catalogoValidarCodigoBarrasUnico_(codigoBarras, null);
 
-  var ahora = utilNow();
-  var formato = {
-    formato_id: idNext_('FORMATO'),
-    producto_id: producto.producto_id,
-    codigo_barras: codigoBarras,
-    nombre_formato: valRequireNonEmpty(datos.nombre_formato, 'nombre del formato'),
-    tipo_empaque: tipoEmpaque,
-    unidades_por_empaque: unidades,
-    activo: CONFIG.BOOL.SI,
-    created_at: ahora,
-    updated_at: ahora
-  };
-  dbAppendRow_('FORMATOS_EMPAQUE', formato);
-  histRegistrar_(usuarioId, 'FORMATO', formato.formato_id, 'creacion', '',
-    producto.nombre + ' / ' + formato.nombre_formato + ' (' + codigoBarras + ')',
-    origen);
-  return formato;
+  return dbConLock_(function () {
+    var producto = dbFindById_('PRODUCTOS', utilTrim(datos.producto_id));
+    if (!producto) throw new Error('Producto no encontrado: ' + datos.producto_id);
+    catalogoValidarCodigoBarrasUnico_(codigoBarras, null);
+
+    var ahora = utilNow();
+    var formato = {
+      formato_id: idNext_('FORMATO'),
+      producto_id: producto.producto_id,
+      codigo_barras: codigoBarras,
+      nombre_formato: valRequireNonEmpty(datos.nombre_formato, 'nombre del formato'),
+      tipo_empaque: tipoEmpaque,
+      unidades_por_empaque: unidades,
+      activo: CONFIG.BOOL.SI,
+      created_at: ahora,
+      updated_at: ahora
+    };
+    dbAppendRow_('FORMATOS_EMPAQUE', formato);
+    histRegistrar_(usuarioId, 'FORMATO', formato.formato_id, 'creacion', '',
+      producto.nombre + ' / ' + formato.nombre_formato + ' (' + codigoBarras + ')',
+      origen);
+    return formato;
+  });
 }
 
 /**

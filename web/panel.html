@@ -127,6 +127,7 @@
     <button id="tabbtn-inventario" onclick="mostrarTab('inventario')">Inventario</button>
     <button id="tabbtn-movimientos" onclick="mostrarTab('movimientos')">Movimientos</button>
     <button id="tabbtn-trazabilidad" onclick="mostrarTab('trazabilidad')">Trazabilidad</button>
+    <button id="tabbtn-ajustes" onclick="mostrarTab('ajustes')">Ajustes</button>
     <button id="tabbtn-usuarios" onclick="mostrarTab('usuarios')">Usuarios</button>
   </div>
 
@@ -192,6 +193,52 @@
     </div>
   </section>
 
+  <!-- ============================== AJUSTES ============================= -->
+  <section id="tab-ajustes" class="tab">
+    <div class="panel">
+      <h2>Ajuste manual de stock</h2>
+      <p class="muted">Para corregir errores (conteo físico distinto, ingreso o
+        retiro equivocado). El ajuste queda registrado como movimiento auditado
+        con tu nombre y el motivo — el historial nunca se edita ni se borra.</p>
+      <div class="filtros">
+        <label>Producto
+          <select id="aj-producto" onchange="ajusteActualizarFormatos()">
+            <option value="">Selecciona…</option>
+          </select>
+        </label>
+        <label>Formato
+          <select id="aj-formato" onchange="ajusteActualizarVista()">
+            <option value="">—</option>
+          </select>
+        </label>
+        <label>Acción
+          <select id="aj-signo" onchange="ajusteActualizarVista()">
+            <option value="1">Sumar al stock (+)</option>
+            <option value="-1">Restar del stock (−)</option>
+          </select>
+        </label>
+        <label>Empaques
+          <input type="number" id="aj-cantidad" min="1" value="1"
+            oninput="ajusteActualizarVista()" style="width:6rem">
+        </label>
+      </div>
+      <label style="display:block;font-size:.8rem;color:var(--marron-claro);margin-bottom:.6rem">
+        Motivo (obligatorio)
+        <input id="aj-motivo" placeholder="p. ej. conteo físico 2026-07-15: faltaban 2 cajas"
+          style="width:100%;padding:.5rem;border:1px solid var(--borde);border-radius:6px;margin-top:.25rem">
+      </label>
+      <p id="aj-vista" class="muted" style="font-weight:600"></p>
+      <button class="primario" id="aj-boton" onclick="confirmarAjuste()">Registrar ajuste</button>
+    </div>
+    <div class="panel">
+      <h2>¿Revertir un movimiento completo?</h2>
+      <p class="muted">Ve a la pestaña <strong>Movimientos</strong>, abre el
+        detalle del movimiento equivocado y usa el botón
+        <strong>Revertir movimiento</strong>: se creará una REVERSA con las
+        cantidades opuestas, sin tocar el original.</p>
+    </div>
+  </section>
+
   <!-- ============================= USUARIOS ============================= -->
   <section id="tab-usuarios" class="tab">
     <div class="panel">
@@ -223,7 +270,11 @@
   <div class="caja">
     <h2 id="det-titulo" style="color:var(--marron);margin-top:0"></h2>
     <div id="det-contenido"></div>
-    <p><button class="accion" onclick="cerrarDetalle()">Cerrar</button></p>
+    <p>
+      <button class="accion" id="det-revertir" style="display:none;color:var(--err)"
+        onclick="revertirMovimiento()">↩️ Revertir movimiento</button>
+      <button class="accion" onclick="cerrarDetalle()">Cerrar</button>
+    </p>
   </div>
 </div>
 
@@ -242,11 +293,13 @@ function llamar(fn, args, onOk, onErr) {
   Sesion.api(fn, args, onOk, onErr);
 }
 function mostrarTab(nombre) {
-  ['dashboard', 'inventario', 'movimientos', 'trazabilidad', 'usuarios'].forEach(function (t) {
-    document.getElementById('tab-' + t).classList.toggle('activa', t === nombre);
-    document.getElementById('tabbtn-' + t).classList.toggle('activa', t === nombre);
-  });
+  ['dashboard', 'inventario', 'movimientos', 'trazabilidad', 'ajustes', 'usuarios']
+    .forEach(function (t) {
+      document.getElementById('tab-' + t).classList.toggle('activa', t === nombre);
+      document.getElementById('tabbtn-' + t).classList.toggle('activa', t === nombre);
+    });
   if (nombre === 'usuarios') cargarUsuarios();
+  if (nombre === 'ajustes') ajusteActualizarFormatos();
 }
 function tablaMovimientos(movs) {
   if (!movs.length) return '<p class="muted">Sin movimientos para los filtros elegidos.</p>';
@@ -287,6 +340,16 @@ function renderDashboard(d) {
         d.stock_minimo + ')</span></div>';
 
     var alertas = '';
+    // Fallos parciales de confirmación (M3): lo más urgente, va primero.
+    var pendientes = d.movimientos_en_proceso || [];
+    if (pendientes.length) {
+      alertas += '<p style="color:var(--err);font-weight:600">⚠ ' + pendientes.length +
+        ' movimiento(s) quedaron a medio confirmar (EN_PROCESO): ' +
+        pendientes.map(function (m) {
+          return esc(m.movimiento_id) + ' (' + esc(m.tipo) + ', ' + esc(m.fecha_hora) + ')';
+        }).join(', ') +
+        '. Revisa la hoja de cálculo y reconcilia el stock si es necesario.</p>';
+    }
     if (d.productos_sin_stock.length) {
       alertas += '<p style="color:var(--err)"><strong>Agotados:</strong> ' +
         d.productos_sin_stock.map(function (p) { return esc(p.nombre); }).join(', ') + '</p>';
@@ -332,7 +395,7 @@ function renderInventario() {
   document.getElementById('lista-inventario').innerHTML = html + '</table>';
 }
 function poblarSelectsProducto() {
-  ['f-producto', 't-producto'].forEach(function (id) {
+  ['f-producto', 't-producto', 'aj-producto'].forEach(function (id) {
     var sel = document.getElementById(id);
     var actual = sel.value;
     sel.innerHTML = '<option value="">' +
@@ -344,21 +407,137 @@ function poblarSelectsProducto() {
   });
 }
 
+// -------------------------------- ajustes ----------------------------------
+function productoDe_(productoId) {
+  return inventarioCache.filter(function (p) {
+    return p.producto_id === productoId;
+  })[0] || null;
+}
+function formatoSeleccionado_() {
+  var p = productoDe_(document.getElementById('aj-producto').value);
+  if (!p) return null;
+  var cb = document.getElementById('aj-formato').value;
+  return p.equivalencias.filter(function (f) {
+    return f.codigo_barras === cb;
+  })[0] || null;
+}
+function ajusteActualizarFormatos() {
+  var p = productoDe_(document.getElementById('aj-producto').value);
+  var sel = document.getElementById('aj-formato');
+  sel.innerHTML = !p ? '<option value="">—</option>' :
+    p.equivalencias.map(function (f) {
+      return '<option value="' + esc(f.codigo_barras) + '">' +
+        esc(f.nombre_formato) + ' (' + f.unidades_por_empaque + ' unid.)</option>';
+    }).join('') || '<option value="">Sin formatos activos</option>';
+  ajusteActualizarVista();
+}
+function ajusteActualizarVista() {
+  var p = productoDe_(document.getElementById('aj-producto').value);
+  var f = formatoSeleccionado_();
+  var vista = document.getElementById('aj-vista');
+  if (!p || !f) { vista.textContent = ''; return; }
+  var signo = parseInt(document.getElementById('aj-signo').value, 10);
+  var cantidad = parseInt(document.getElementById('aj-cantidad').value, 10) || 0;
+  var unidades = signo * cantidad * f.unidades_por_empaque;
+  var resultante = p.stock_unidades + unidades;
+  vista.textContent = 'Ajuste: ' + (unidades >= 0 ? '+' : '') + unidades +
+    ' unidades → el stock de "' + p.nombre + '" pasaría de ' +
+    p.stock_unidades + ' a ' + resultante + ' unidades.';
+  vista.style.color = resultante < 0 ? 'var(--err)' : '';
+}
+function confirmarAjuste() {
+  var p = productoDe_(document.getElementById('aj-producto').value);
+  var f = formatoSeleccionado_();
+  var signo = parseInt(document.getElementById('aj-signo').value, 10);
+  var cantidad = parseInt(document.getElementById('aj-cantidad').value, 10) || 0;
+  var motivo = (document.getElementById('aj-motivo').value || '').trim();
+  if (!p || !f) { Ui.toast('Selecciona producto y formato.', 'err'); return; }
+  if (cantidad < 1) { Ui.toast('La cantidad de empaques debe ser 1 o más.', 'err'); return; }
+  if (!motivo) { Ui.toast('El motivo del ajuste es obligatorio.', 'err'); return; }
+
+  var unidades = signo * cantidad * f.unidades_por_empaque;
+  Ui.confirmar('Registrar ajuste',
+    p.nombre + '\n' + (signo > 0 ? 'Sumar ' : 'Restar ') + cantidad + ' × ' +
+    f.nombre_formato + ' = ' + (unidades >= 0 ? '+' : '') + unidades +
+    ' unidades.\nStock: ' + p.stock_unidades + ' → ' +
+    (p.stock_unidades + unidades) + ' unidades.\n\nMotivo: ' + motivo,
+    function () {
+      var boton = document.getElementById('aj-boton');
+      boton.disabled = true;
+      llamar('apiAjusteConfirmar', [{
+        tipo: 'AJUSTE',
+        observacion: motivo,
+        claveIdempotencia: uuid(),
+        items: [{ codigo_barras: f.codigo_barras, cantidad_empaques: signo * cantidad }]
+      }], function (r) {
+        boton.disabled = false;
+        Ui.toast('Ajuste registrado: ' + r.movimiento_id + '.', 'ok');
+        document.getElementById('aj-motivo').value = '';
+        document.getElementById('aj-cantidad').value = '1';
+        cargarInicial(); // refrescar stock y dashboard
+      }, function (err) {
+        boton.disabled = false;
+        mostrarErrorUi(err);
+      });
+    }, { icono: '⚖️', textoAceptar: 'Registrar ajuste' });
+}
+
+// Reversa de un movimiento completo desde su detalle (Caso 6).
+var detalleActual = null; // { cabecera, detalles } del modal abierto
+function revertirMovimiento() {
+  if (!detalleActual) return;
+  var m = detalleActual.cabecera;
+  Ui.formulario('Revertir ' + m.movimiento_id,
+    [{ id: 'motivo', label: 'Motivo de la reversa (obligatorio)',
+       ayuda: 'Se creará un movimiento REVERSA con las cantidades opuestas ' +
+         'usando la equivalencia vigente del catálogo. El original no se toca.' }],
+    function (v) {
+      if (!(v.motivo || '').trim()) return 'El motivo es obligatorio.';
+      var items = detalleActual.detalles.map(function (d) {
+        var unidadesSnap = parseInt(d.unidades_por_empaque_snapshot, 10) || 1;
+        var totalUnidades = parseInt(d.total_unidades, 10) || 0;
+        return { codigo_barras: d.codigo_barras_snapshot,
+          cantidad_empaques: -Math.round(totalUnidades / unidadesSnap) };
+      });
+      llamar('apiAjusteConfirmar', [{
+        tipo: 'REVERSA',
+        observacion: 'Reversa de ' + m.movimiento_id + ': ' + v.motivo,
+        claveIdempotencia: uuid(),
+        items: items
+      }], function (r) {
+        cerrarDetalle();
+        Ui.toast('Reversa registrada: ' + r.movimiento_id + '.', 'ok');
+        cargarInicial();
+      }, mostrarErrorUi);
+    }, { icono: '↩️', textoAceptar: 'Revertir' });
+}
+
 // ------------------------------ movimientos --------------------------------
+var MOV_LIMITE_PANEL = 200; // debe coincidir con MOV_LIMITE_DEFAULT del backend
 function cargarMovimientos() {
   var filtros = {
     desde: document.getElementById('f-desde').value,
     hasta: document.getElementById('f-hasta').value,
     tipo: document.getElementById('f-tipo').value,
-    productoId: document.getElementById('f-producto').value
+    productoId: document.getElementById('f-producto').value,
+    limite: MOV_LIMITE_PANEL
   };
   document.getElementById('lista-movimientos').innerHTML = '<p class="muted">Buscando…</p>';
   llamar('apiMovListar', [filtros], function (movs) {
-    document.getElementById('lista-movimientos').innerHTML = tablaMovimientos(movs || []);
+    movs = movs || [];
+    var html = tablaMovimientos(movs);
+    // Si llegó justo el tope, probablemente hay más: avisar y sugerir filtrar.
+    if (movs.length >= MOV_LIMITE_PANEL) {
+      html = '<p class="muted">Mostrando los ' + MOV_LIMITE_PANEL +
+        ' movimientos más recientes. Usa los filtros de fecha o tipo para ' +
+        'acotar la búsqueda.</p>' + html;
+    }
+    document.getElementById('lista-movimientos').innerHTML = html;
   });
 }
 function abrirDetalle(movimientoId) {
   llamar('apiMovObtenerDetalle', [movimientoId], function (r) {
+    detalleActual = r;
     var m = r.cabecera;
     document.getElementById('det-titulo').textContent =
       m.movimiento_id + ' — ' + m.tipo;
@@ -379,11 +558,16 @@ function abrirDetalle(movimientoId) {
         '<td class="num">' + esc(d.total_unidades) + '</td>' +
         '<td class="num">' + esc(d.stock_anterior) + ' → ' + esc(d.stock_posterior) + '</td></tr>';
     });
+    // Revertir solo movimientos que suman/restan stock y que no sean ya una
+    // reversa (evita reversas de reversas encadenadas).
+    var botonRevertir = document.getElementById('det-revertir');
+    botonRevertir.style.display = m.tipo === 'REVERSA' ? 'none' : '';
     document.getElementById('det-contenido').innerHTML = html + '</table>';
     document.getElementById('detalle-mov').style.display = 'flex';
   });
 }
 function cerrarDetalle() {
+  detalleActual = null;
   document.getElementById('detalle-mov').style.display = 'none';
 }
 

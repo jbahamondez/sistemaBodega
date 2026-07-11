@@ -82,19 +82,41 @@ window.uuid = function () {
   }
 
   // --------------------------- transporte HTTP -----------------------------
+  var TIMEOUT_MS = 30000; // corta peticiones colgadas (M5): red débil de bodega
+
   function llamarServidor(fn, args, onOk, onErr) {
-    fetch(API_URL, {
+    // AbortController corta el fetch si el servidor no responde a tiempo, en
+    // vez de dejar la UI en "Procesando…" para siempre. Si el navegador no
+    // lo soporta, la petición sigue sin timeout (degradación aceptable).
+    var control = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var expiro = false;
+    var temporizador = setTimeout(function () {
+      expiro = true;
+      if (control) control.abort();
+    }, TIMEOUT_MS);
+
+    var opciones = {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
       body: JSON.stringify({ fn: fn, args: args || [] })
-    }).then(function (r) {
+    };
+    if (control) opciones.signal = control.signal;
+
+    fetch(API_URL, opciones).then(function (r) {
       if (!r.ok) throw new Error('Error de conexión (HTTP ' + r.status + ').');
       return r.json();
     }).then(function (res) {
+      clearTimeout(temporizador);
       if (res.ok) onOk(res.data);
       else onErr(new Error(res.error || 'Error desconocido.'));
     }).catch(function (err) {
-      onErr(err.message ? err : new Error('Sin conexión con el servidor.'));
+      clearTimeout(temporizador);
+      if (expiro) {
+        onErr(new Error('El servidor tardó demasiado en responder. Revisa tu ' +
+          'conexión e intenta de nuevo.'));
+      } else {
+        onErr(err.message ? err : new Error('Sin conexión con el servidor.'));
+      }
     });
   }
 

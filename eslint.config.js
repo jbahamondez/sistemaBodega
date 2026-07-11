@@ -69,6 +69,7 @@ const projectGlobals = {
   dbDeleteRowByIndex_: 'readonly',
   dbCeldaATexto_: 'readonly',
   dbFormatearRangoTexto_: 'readonly',
+  dbConLock_: 'readonly',
   // Ids.gs
   idNext_: 'readonly',
   idNextBatch_: 'readonly',
@@ -112,6 +113,7 @@ const projectGlobals = {
   movListar_: 'readonly',
   movObtenerDetalle_: 'readonly',
   movTrazabilidadProducto_: 'readonly',
+  movPendientesAntiguos_: 'readonly',
   // Panel.gs
   panelDashboard_: 'readonly',
   // Auth.gs
@@ -224,6 +226,7 @@ module.exports = [
         navigator: 'readonly',
         location: 'readonly',
         setTimeout: 'readonly',
+        AbortController: 'readonly',
         API_URL: 'readonly',
         Sesion: 'readonly',
         Ui: 'readonly',

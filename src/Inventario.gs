@@ -37,6 +37,7 @@ function invListar_() {
           var unidades = utilToInt(f.unidades_por_empaque) || 1;
           return {
             nombre_formato: f.nombre_formato,
+            codigo_barras: f.codigo_barras, // para armar ajustes desde el panel
             unidades_por_empaque: unidades,
             empaques_completos: Math.floor(stock / unidades)
           };
