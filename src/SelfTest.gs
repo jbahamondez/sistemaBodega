@@ -170,7 +170,8 @@ function runMovimientoTests() {
   var resultados = [];
   var tests = [testMovimientosCasos_, testAuthYPermisos_,
     testCorreccionCaso6_, testImportacionCasos_, testHttpRouter_,
-    testPlanillaRealChocolateria_, testGestionUsuarios_, testEstadoLote_];
+    testPlanillaRealChocolateria_, testGestionUsuarios_, testEstadoLote_,
+    testIdempotencia_, testFormulaInjection_];
   tests.forEach(function (t) {
     try {
       t();
@@ -318,19 +319,26 @@ function testMovimientosCasos_() {
  */
 function testAuthYPermisos_() {
   usuarioCrear_({ nombre: 'Jefa Test', identificador_acceso: 'jefa.test',
-    rol: 'JEFATURA', pin: '1234' });
+    rol: 'JEFATURA', pin: '123456' });
   var trabCreado = usuarioCrear_({ nombre: 'Trabajador Test',
-    identificador_acceso: 'trab.test', rol: 'TRABAJADOR', pin: '5678' });
+    identificador_acceso: 'trab.test', rol: 'TRABAJADOR', pin: '567890' });
+
+  // PIN mínimo de 6 dígitos (C1).
+  var lanzoPinCorto = false;
+  try {
+    usuarioCrear_({ nombre: 'Corto', identificador_acceso: 'corto', rol: 'TRABAJADOR', pin: '123' });
+  } catch (e) { lanzoPinCorto = e.message.indexOf('al menos 6') !== -1; }
+  assert_(lanzoPinCorto, 'usuarioCrear_ exige PIN de al menos 6 dígitos');
 
   // PIN incorrecto rechazado sin revelar si el usuario existe.
   var lanzo = false;
-  try { apiLogin('jefa.test', '0000'); }
+  try { apiLogin('jefa.test', '000000'); }
   catch (e) { lanzo = e.message.indexOf('incorrecto') !== -1; }
   assert_(lanzo, 'PIN incorrecto rechazado');
 
-  var sesionJefa = apiLogin('jefa.test', '1234');
+  var sesionJefa = apiLogin('jefa.test', '123456');
   assert_(sesionJefa.token && sesionJefa.rol === 'JEFATURA', 'login de jefatura entrega token y rol');
-  var sesionTrab = apiLogin('trab.test', '5678');
+  var sesionTrab = apiLogin('trab.test', '567890');
   assert_(apiSesionInfo(sesionTrab.token).usuario_id === trabCreado.usuario_id,
     'apiSesionInfo restaura la sesión');
 
@@ -397,7 +405,7 @@ function testAuthYPermisos_() {
   try { apiSesionInfo(sesionJefa.token); }
   catch (e) { lanzo = e.message.indexOf('Sesión expirada') !== -1; }
   assert_(lanzo, 'tras logout la sesión no se restaura desde el respaldo');
-  sesionJefa = apiLogin('jefa.test', '1234'); // re-login para pruebas siguientes
+  sesionJefa = apiLogin('jefa.test', '123456'); // re-login para pruebas siguientes
 
   // Un usuario desactivado no puede operar aunque conserve su token.
   usuarioCambiarEstado_(trabCreado.usuario_id, false);
@@ -417,9 +425,23 @@ function testAuthYPermisos_() {
   // La función de bootstrap se bloquea cuando ya existe jefatura activa
   // (es invocable vía google.script.run por no terminar en "_").
   lanzo = false;
-  try { setupCrearUsuarioJefatura('Intruso', 'intruso', '9999'); }
+  try { setupCrearUsuarioJefatura('Intruso', 'intruso', '999999'); }
   catch (e) { lanzo = e.message.indexOf('Ya existe un usuario de jefatura') !== -1; }
   assert_(lanzo, 'setupCrearUsuarioJefatura solo funciona como bootstrap');
+
+  // Lockout anti fuerza bruta (C1): tras AUTH_MAX_INTENTOS fallos, el
+  // identificador queda bloqueado aunque luego se use el PIN correcto.
+  usuarioCrear_({ nombre: 'Cerrojo', identificador_acceso: 'cerrojo',
+    rol: 'TRABAJADOR', pin: '654321' });
+  for (var k = 0; k < 5; k++) {
+    try { apiLogin('cerrojo', 'malmal'); } catch (e) { /* fallo esperado */ }
+  }
+  var bloqueado = false;
+  try { apiLogin('cerrojo', '654321'); } // PIN correcto, pero ya bloqueado
+  catch (e) { bloqueado = e.message.indexOf('Demasiados intentos') !== -1; }
+  assert_(bloqueado, 'C1: 5 fallos bloquean el login aunque el PIN sea correcto');
+  // Limpieza del contador para no afectar otras pruebas.
+  PropertiesService.getScriptProperties().deleteProperty('intentos_cerrojo');
 }
 
 /**
@@ -543,7 +565,7 @@ function testHttpRouter_() {
   }
 
   // Login válido a través del router.
-  var login = post({ fn: 'apiLogin', args: ['jefa.test', '1234'] });
+  var login = post({ fn: 'apiLogin', args: ['jefa.test', '123456'] });
   assert_(login.ok && login.data.token && login.data.rol === 'JEFATURA',
     'router: login entrega token');
 
@@ -553,7 +575,7 @@ function testHttpRouter_() {
     'router: operación autenticada funciona');
 
   // Errores de negocio viajan como ok:false (nunca excepción sin formato).
-  var malPin = post({ fn: 'apiLogin', args: ['jefa.test', '0000'] });
+  var malPin = post({ fn: 'apiLogin', args: ['jefa.test', '000000'] });
   assert_(malPin.ok === false && malPin.error.indexOf('incorrecto') !== -1,
     'router: error de negocio devuelto como ok:false');
 
@@ -561,7 +583,7 @@ function testHttpRouter_() {
   var interna = post({ fn: 'dbSetConfigValue_', args: ['x', 'y'] });
   assert_(interna.ok === false && interna.error.indexOf('desconocida') !== -1,
     'router: función fuera de la whitelist rechazada');
-  var setup = post({ fn: 'setupCrearUsuarioJefatura', args: ['X', 'x', '9999'] });
+  var setup = post({ fn: 'setupCrearUsuarioJefatura', args: ['X', 'x', '999999'] });
   assert_(setup.ok === false, 'router: funciones de setup no expuestas');
 
   // Petición malformada responde JSON de error, no excepción.
@@ -657,7 +679,7 @@ function testCeldaFecha_() {
 /** Gestión de usuarios: editar y eliminar con protecciones de trazabilidad. */
 function testGestionUsuarios_() {
   var temporal = usuarioCrear_({ nombre: 'Temporal Error', identificador_acceso:
-    'temporal.error', rol: 'TRABAJADOR', pin: '1111' });
+    'temporal.error', rol: 'TRABAJADOR', pin: '111111' });
 
   // Editar nombre e identificador CONSERVANDO mayúsculas (reportado: "fran"
   // editado a "Fran" quedaba en minúsculas).
@@ -669,7 +691,7 @@ function testGestionUsuarios_() {
     'usuarioEditar_ conserva las mayúsculas del identificador');
 
   // El login no distingue mayúsculas en el identificador.
-  var sesionMayusculas = apiLogin('TEMPORAL.ok', '1111');
+  var sesionMayusculas = apiLogin('TEMPORAL.ok', '111111');
   assert_(sesionMayusculas.usuario_id === temporal.usuario_id,
     'el login acepta el identificador sin distinguir mayúsculas');
 
@@ -694,7 +716,7 @@ function testGestionUsuarios_() {
   assert_(lanzo, 'usuario con movimientos no se puede eliminar; se sugiere desactivar');
 
   // Nadie puede eliminarse a sí mismo vía API.
-  var sesion = apiLogin('jefa.test', '1234');
+  var sesion = apiLogin('jefa.test', '123456');
   lanzo = false;
   try { apiUsuarioEliminar(sesion.token, sesion.usuario_id); }
   catch (e) { lanzo = e.message.indexOf('propia cuenta') !== -1; }
@@ -705,7 +727,7 @@ function testGestionUsuarios_() {
 function testEstadoLote_() {
   var p1 = catalogoCrearProducto_({ nombre: 'LOTE Uno', codigo_producto: 'LOTE-1' });
   var p2 = catalogoCrearProducto_({ nombre: 'LOTE Dos', codigo_producto: 'LOTE-2' });
-  var sesion = apiLogin('jefa.test', '1234');
+  var sesion = apiLogin('jefa.test', '123456');
 
   var r = apiCatalogoEstadoLote(sesion.token, [p1.producto_id, p2.producto_id], false);
   assert_(r.cambiados === 2, 'lote desactiva los 2 productos en una operación');
@@ -723,6 +745,54 @@ function testEstadoLote_() {
   var r2 = apiCatalogoEstadoLote(sesion.token, [p1.producto_id, p2.producto_id], true);
   assert_(r2.cambiados === 1 && r2.sin_cambio === 1,
     'el lote informa cambiados vs sin cambio');
+}
+
+/**
+ * Idempotencia de confirmación (C2): reenviar la misma operación con la
+ * misma clave no crea un segundo movimiento ni descuenta stock de nuevo.
+ */
+function testIdempotencia_() {
+  var producto = catalogoCrearProducto_({ nombre: 'IDEM Producto', codigo_producto: 'IDEM-1' });
+  catalogoCrearFormato_({ producto_id: producto.producto_id, codigo_barras: 'IDEM-CB-1',
+    nombre_formato: 'Caja', tipo_empaque: 'CAJA', unidades_por_empaque: 10 });
+  // Stock inicial 100 por AJUSTE.
+  movConfirmar_({ tipo: 'AJUSTE', usuarioNombre: 'Test', observacion: 'stock inicial',
+    items: [{ codigo_barras: 'IDEM-CB-1', cantidad_empaques: 10 }] });
+  assert_(invGetStock_(producto.producto_id) === 100, 'idem: stock inicial 100');
+
+  var clave = 'clave-fija-de-prueba-123';
+  var primero = movConfirmar_({ tipo: 'RETIRO', usuarioNombre: 'Test',
+    claveIdempotencia: clave,
+    items: [{ codigo_barras: 'IDEM-CB-1', cantidad_empaques: 3 }] });
+  assert_(invGetStock_(producto.producto_id) === 70, 'idem: primer retiro descuenta a 70');
+  assert_(!primero.reintento, 'idem: el primer envío no es reintento');
+
+  var movimientosAntes = movListar_({ productoId: producto.producto_id }).length;
+
+  // Reenvío con la MISMA clave (simula reintento tras corte de red).
+  var segundo = movConfirmar_({ tipo: 'RETIRO', usuarioNombre: 'Test',
+    claveIdempotencia: clave,
+    items: [{ codigo_barras: 'IDEM-CB-1', cantidad_empaques: 3 }] });
+  assert_(segundo.movimiento_id === primero.movimiento_id,
+    'C2: el reintento devuelve el MISMO movimiento');
+  assert_(segundo.reintento === true, 'C2: el reintento viene marcado');
+  assert_(invGetStock_(producto.producto_id) === 70,
+    'C2: el reintento NO vuelve a descontar stock');
+  assert_(movListar_({ productoId: producto.producto_id }).length === movimientosAntes,
+    'C2: el reintento no crea un segundo movimiento');
+}
+
+/**
+ * Anti formula injection (A1): un nombre que empieza con "=" se escribe en
+ * una celda formateada como texto, así Sheets no lo evalúa como fórmula y el
+ * valor se lee de vuelta idéntico (sin recalcular ni transformar).
+ */
+function testFormulaInjection_() {
+  var maligno = catalogoCrearProducto_({
+    nombre: '=IMPORTRANGE("x","y")', codigo_producto: 'INJ-1' });
+  var fila = dbFindById_('PRODUCTOS', maligno.producto_id);
+  assert_(fila.nombre === '=IMPORTRANGE("x","y")',
+    'A1: el nombre con "=" se guarda y lee como texto literal, sin evaluarse');
 }
 
 /** Integración: requiere setupDatabase() ejecutado. Se omite si no lo está. */

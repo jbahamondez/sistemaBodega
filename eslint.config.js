@@ -68,6 +68,7 @@ const projectGlobals = {
   dbWriteAllRows_: 'readonly',
   dbDeleteRowByIndex_: 'readonly',
   dbCeldaATexto_: 'readonly',
+  dbFormatearRangoTexto_: 'readonly',
   // Ids.gs
   idNext_: 'readonly',
   idNextBatch_: 'readonly',
@@ -105,6 +106,7 @@ const projectGlobals = {
   invActualizarStock_: 'readonly',
   // Movimientos.gs
   movConfirmar_: 'readonly',
+  movBuscarPorClave_: 'readonly',
   movBuscarCodigo_: 'readonly',
   movResolverItem_: 'readonly',
   movListar_: 'readonly',
@@ -119,6 +121,8 @@ const projectGlobals = {
   authGuardarSesion_: 'readonly',
   authResolverUsuarioId_: 'readonly',
   authLimpiarSesionesExpiradas_: 'readonly',
+  authVerificarBloqueo_: 'readonly',
+  authRegistrarFallo_: 'readonly',
   // Usuarios.gs
   usuariosListar_: 'readonly',
   usuarioCrear_: 'readonly',
@@ -127,6 +131,7 @@ const projectGlobals = {
   usuarioResetPin_: 'readonly',
   usuarioEditar_: 'readonly',
   usuarioEliminar_: 'readonly',
+  usuarioIdentificadorEnUso_: 'readonly',
   // Api.gs (capa pública; referenciada por Http.gs y las pruebas)
   apiLogin: 'readonly',
   apiLogout: 'readonly',
@@ -222,6 +227,7 @@ module.exports = [
         API_URL: 'readonly',
         Sesion: 'readonly',
         Ui: 'readonly',
+        uuid: 'readonly',
         clearTimeout: 'readonly',
         setInterval: 'readonly'
       }

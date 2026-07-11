@@ -152,6 +152,9 @@
 // Carro en preparación (borrador, §23): vive en el navegador y en
 // localStorage. No toca el stock hasta confirmar.
 var carro = [];               // [{codigo_barras, producto_nombre, formato_nombre, unidades_por_empaque, cantidad}]
+// Clave de idempotencia del ingreso en preparación (C2): evita duplicar el
+// movimiento si un corte de red obliga a reintentar la confirmación.
+var claveOperacion = null;
 var cacheCodigos = {};        // lookups ya resueltos, para escaneo continuo sin esperas
 var procesando = false;
 var ultimoScan = { codigo: '', t: 0 };
@@ -160,7 +163,7 @@ var CLAVE_BORRADOR = 'ingreso_borrador_v1';
 function esc(s) {
   return String(s === null || s === undefined ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 function estado(mensaje, tipo) {
   var el = document.getElementById('estado-escaneo');
@@ -229,6 +232,7 @@ function agregarEscaneo(codigo) {
   });
 }
 function agregarAlCarro(info) {
+  if (!claveOperacion) claveOperacion = uuid(); // primer producto: nace la clave
   carro.push({
     codigo_barras: info.codigo_barras,
     producto_nombre: info.producto_nombre,
@@ -293,6 +297,7 @@ function guardarBorrador() {
   try {
     localStorage.setItem(CLAVE_BORRADOR, JSON.stringify({
       carro: carro,
+      clave: claveOperacion,
       observacion: document.getElementById('observacion').value
     }));
   } catch (e) { /* almacenamiento no disponible: el carro sigue en memoria */ }
@@ -304,6 +309,7 @@ function restaurarBorrador() {
     var borrador = JSON.parse(crudo);
     if (borrador.carro && borrador.carro.length) {
       carro = borrador.carro;
+      claveOperacion = borrador.clave || uuid();
       document.getElementById('observacion').value = borrador.observacion || '';
       estado('Se restauró un ingreso en preparación que no fue confirmado.', 'ok');
       renderCarro();
@@ -311,6 +317,7 @@ function restaurarBorrador() {
   } catch (e) { /* borrador corrupto: se ignora */ }
 }
 function limpiarBorrador() {
+  claveOperacion = null;
   try { localStorage.removeItem(CLAVE_BORRADOR); } catch (e) { /* sin efecto */ }
 }
 
@@ -324,6 +331,7 @@ function confirmarIngreso() {
 
   Sesion.api('apiIngresoConfirmar', [{
     observacion: document.getElementById('observacion').value,
+    claveIdempotencia: claveOperacion,
     items: carro.map(function (i) {
       return { codigo_barras: i.codigo_barras, cantidad_empaques: i.cantidad };
     })
@@ -335,7 +343,8 @@ function confirmarIngreso() {
         ' empaques = +' + d.unidades + ' unidades (stock: ' + d.stock_posterior + ')';
     });
     document.getElementById('resultado-texto').textContent =
-      'INGRESO CONFIRMADO — ' + r.movimiento_id + '\n' +
+      (r.reintento ? 'INGRESO YA REGISTRADO (evitado duplicado) — ' : 'INGRESO CONFIRMADO — ') +
+      r.movimiento_id + '\n' +
       r.fecha_hora + '\n' + lineas.join('\n') +
       '\nTotal: +' + r.total_unidades + ' unidades.';
     document.getElementById('resultado').style.display = '';

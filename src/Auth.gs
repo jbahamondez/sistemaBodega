@@ -12,8 +12,19 @@
 
 var AUTH_TTL_SEGUNDOS = 21600; // 6 horas
 var AUTH_PREFIJO_CACHE = 'sesion_';
+var AUTH_PREFIJO_INTENTOS = 'intentos_';
+var AUTH_MAX_INTENTOS = 5;          // fallos consecutivos antes de bloquear
+var AUTH_BLOQUEO_MS = 15 * 60 * 1000; // 15 minutos de bloqueo
 
-/** Valida identificador + PIN. Devuelve { token, usuario_id, nombre, rol }. */
+/**
+ * Valida identificador + PIN. Devuelve { token, usuario_id, nombre, rol }.
+ *
+ * Anti fuerza bruta (auditoría C1): la URL de la API es pública y el login
+ * es anónimo, así que un PIN corto sería adivinable por enumeración. Cada
+ * identificador acumula fallos consecutivos; al llegar a AUTH_MAX_INTENTOS
+ * se bloquea por AUTH_BLOQUEO_MS. El bloqueo aplica igual a identificadores
+ * inexistentes para no revelar cuáles existen.
+ */
 function authLogin_(identificador, pin) {
   identificador = utilTrim(identificador);
   pin = utilTrim(pin);
@@ -21,17 +32,23 @@ function authLogin_(identificador, pin) {
   var errorGenerico = 'Usuario o PIN incorrecto.';
   if (!identificador || !pin) throw new Error(errorGenerico);
 
+  var claveIntentos = AUTH_PREFIJO_INTENTOS + identificador.toLowerCase();
+  authVerificarBloqueo_(claveIntentos);
+
   // El identificador no distingue mayúsculas ("Fran" y "fran" entran igual);
   // el PIN sí es exacto.
   var identificadorBuscado = identificador.toLowerCase();
   var usuario = dbFindOne_('USUARIOS', function (u) {
     return u.identificador_acceso.toLowerCase() === identificadorBuscado;
   });
-  if (!usuario || !utilToBool(usuario.activo)) throw new Error(errorGenerico);
-  if (!utilSafeEquals(usuario.pin_hash, utilHashPin(pin, usuario.pin_salt))) {
+  var pinCorrecto = usuario &&
+    utilSafeEquals(usuario.pin_hash, utilHashPin(pin, usuario.pin_salt));
+  if (!usuario || !utilToBool(usuario.activo) || !pinCorrecto) {
+    authRegistrarFallo_(claveIntentos);
     throw new Error(errorGenerico);
   }
 
+  PropertiesService.getScriptProperties().deleteProperty(claveIntentos);
   authLimpiarSesionesExpiradas_();
 
   var token = Utilities.getUuid();
@@ -42,6 +59,40 @@ function authLogin_(identificador, pin) {
     nombre: usuario.nombre,
     rol: usuario.rol
   };
+}
+
+/** Lanza error si el identificador está bloqueado por exceso de fallos. */
+function authVerificarBloqueo_(claveIntentos) {
+  var crudo = PropertiesService.getScriptProperties().getProperty(claveIntentos);
+  if (!crudo) return;
+  try {
+    var registro = JSON.parse(crudo);
+    if (registro.n >= AUTH_MAX_INTENTOS) {
+      var restanteMs = registro.t + AUTH_BLOQUEO_MS - Date.now();
+      if (restanteMs > 0) {
+        throw new Error('Demasiados intentos fallidos. Espera ' +
+          Math.ceil(restanteMs / 60000) + ' minuto(s) e intenta de nuevo.');
+      }
+      // Bloqueo vencido: se limpia y se permite intentar otra vez.
+      PropertiesService.getScriptProperties().deleteProperty(claveIntentos);
+    }
+  } catch (e) {
+    if (e.message && e.message.indexOf('Demasiados intentos') === 0) throw e;
+    // Registro corrupto: se descarta sin bloquear.
+    PropertiesService.getScriptProperties().deleteProperty(claveIntentos);
+  }
+}
+
+/** Suma un fallo de login al contador del identificador. */
+function authRegistrarFallo_(claveIntentos) {
+  var props = PropertiesService.getScriptProperties();
+  var n = 0;
+  try {
+    var previo = JSON.parse(props.getProperty(claveIntentos) || 'null');
+    // Los fallos antiguos (fuera de la ventana de bloqueo) no cuentan.
+    if (previo && Date.now() - previo.t < AUTH_BLOQUEO_MS) n = previo.n;
+  } catch (e) { /* contador corrupto: se reinicia */ }
+  props.setProperty(claveIntentos, JSON.stringify({ n: n + 1, t: Date.now() }));
 }
 
 /** Cierra la sesión asociada al token (caché y respaldo durable). */
@@ -111,18 +162,33 @@ function authResolverUsuarioId_(token) {
   }
 }
 
-/** Borra del respaldo durable las sesiones vencidas (se ejecuta al loguear). */
+/**
+ * Borra del respaldo durable las sesiones vencidas y los contadores de
+ * intentos ya irrelevantes (se ejecuta al loguear).
+ */
 function authLimpiarSesionesExpiradas_() {
   var props = PropertiesService.getScriptProperties();
   var todas = props.getProperties();
   var ahora = Date.now();
   Object.keys(todas).forEach(function (clave) {
-    if (clave.indexOf(AUTH_PREFIJO_CACHE) !== 0) return;
-    try {
-      var sesion = JSON.parse(todas[clave]);
-      if (!sesion.exp || sesion.exp < ahora) props.deleteProperty(clave);
-    } catch (e) {
-      props.deleteProperty(clave);
+    if (clave.indexOf(AUTH_PREFIJO_CACHE) === 0) {
+      try {
+        var sesion = JSON.parse(todas[clave]);
+        if (!sesion.exp || sesion.exp < ahora) props.deleteProperty(clave);
+      } catch (e) {
+        props.deleteProperty(clave);
+      }
+      return;
+    }
+    if (clave.indexOf(AUTH_PREFIJO_INTENTOS) === 0) {
+      try {
+        var registro = JSON.parse(todas[clave]);
+        if (!registro.t || ahora - registro.t > AUTH_BLOQUEO_MS) {
+          props.deleteProperty(clave);
+        }
+      } catch (e) {
+        props.deleteProperty(clave);
+      }
     }
   });
 }

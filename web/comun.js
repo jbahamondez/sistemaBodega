@@ -9,6 +9,17 @@
  */
 /* global API_URL */
 
+/**
+ * Identificador único para claves de idempotencia de operaciones (C2).
+ * Usa crypto.randomUUID cuando está disponible; si no, un fallback simple
+ * (suficiente: solo necesita ser único por dispositivo/operación).
+ */
+window.uuid = function () {
+  if (window.crypto && window.crypto.randomUUID) return window.crypto.randomUUID();
+  return 'op-' + Date.now().toString(36) + '-' +
+    Math.random().toString(36).slice(2, 10);
+};
+
 (function () {
   'use strict';
 
@@ -360,7 +371,7 @@ window.Ui = (function () {
   function esc(s) {
     return String(s === null || s === undefined ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
   function cerrarModal() {
     modal.style.display = 'none';

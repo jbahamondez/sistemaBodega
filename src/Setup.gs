@@ -138,8 +138,8 @@ function setupCrearUsuarioJefatura(nombre, identificadorAcceso, pin) {
 
   valRequireNonEmpty(nombre, 'nombre');
   valRequireNonEmpty(identificadorAcceso, 'identificador de acceso');
-  if (pin.length < 4) {
-    throw new Error('El PIN debe tener al menos 4 dígitos.');
+  if (pin.length < 6) {
+    throw new Error('El PIN debe tener al menos 6 dígitos.');
   }
 
   var existente = dbFindOne_('USUARIOS', function (u) {

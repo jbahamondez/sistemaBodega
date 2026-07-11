@@ -45,6 +45,7 @@ function apiRetiroConfirmar(token, datos) {
     origen: 'BODEGA',
     destino: 'TIENDA',
     observacion: datos && datos.observacion,
+    claveIdempotencia: datos && datos.claveIdempotencia,
     items: datos && datos.items
   });
 }
@@ -74,6 +75,7 @@ function apiIngresoConfirmar(token, datos) {
     origen: 'PROVEEDOR',
     destino: 'BODEGA',
     observacion: datos && datos.observacion,
+    claveIdempotencia: datos && datos.claveIdempotencia,
     items: datos && datos.items
   });
 }

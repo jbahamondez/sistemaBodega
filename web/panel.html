@@ -205,7 +205,7 @@
           </select>
         </label>
         <label>PIN inicial<input id="u-pin" type="password" inputmode="numeric"
-          minlength="4" required></label>
+          minlength="6" required></label>
         <button type="submit" class="primario">Crear</button>
       </form>
       <p class="muted">El PIN se guarda solo como hash con salt; comunícalo al
@@ -236,7 +236,7 @@ var inventarioCache = [];
 function esc(s) {
   return String(s === null || s === undefined ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 function llamar(fn, args, onOk, onErr) {
   Sesion.api(fn, args, onOk, onErr);
@@ -388,35 +388,40 @@ function cerrarDetalle() {
 }
 
 // -------------------------------- usuarios ---------------------------------
+var usuariosCache = {}; // usuario_id -> usuario, para no pasar datos por onclick
+function usuarioDe_(id) { return usuariosCache[id] || {}; }
 function cargarUsuarios() {
   llamar('apiUsuariosListar', [], function (usuarios) {
+    usuariosCache = {};
     if (!usuarios || !usuarios.length) {
       document.getElementById('lista-usuarios').innerHTML =
         '<p class="muted">Sin usuarios registrados.</p>';
       return;
     }
+    // Los onclick solo reciben el usuario_id (del sistema, sin caracteres
+    // conflictivos); nombre e identificador se leen del caché por id, para
+    // no interpolar texto de usuario en atributos HTML/JS (auditoría A2).
     var html = '<table><tr><th>ID</th><th>Nombre</th><th>Identificador</th>' +
       '<th>Rol</th><th>Estado</th><th>Acciones</th></tr>';
     usuarios.forEach(function (u) {
+      usuariosCache[u.usuario_id] = u;
       var activo = u.activo === 'SI';
-      html += '<tr><td>' + esc(u.usuario_id) + '</td>' +
+      var id = esc(u.usuario_id);
+      var rolDestino = u.rol === 'JEFATURA' ? 'TRABAJADOR' : 'JEFATURA';
+      html += '<tr><td>' + id + '</td>' +
         '<td>' + esc(u.nombre) + '</td>' +
         '<td>' + esc(u.identificador_acceso) + '</td>' +
         '<td>' + esc(u.rol) + '</td>' +
         '<td>' + (activo ? 'ACTIVO' : '<span style="color:var(--err)">INACTIVO</span>') + '</td>' +
         '<td>' +
-        '<button class="accion" onclick="editarUsuario(\'' + esc(u.usuario_id) +
-          '\',\'' + esc(u.nombre) + '\',\'' + esc(u.identificador_acceso) +
-          '\')">Editar</button>' +
-        '<button class="accion" onclick="cambiarEstadoUsuario(\'' + esc(u.usuario_id) +
+        '<button class="accion" onclick="editarUsuario(\'' + id + '\')">Editar</button>' +
+        '<button class="accion" onclick="cambiarEstadoUsuario(\'' + id +
           '\',' + !activo + ')">' + (activo ? 'Desactivar' : 'Activar') + '</button>' +
-        '<button class="accion" onclick="cambiarRolUsuario(\'' + esc(u.usuario_id) +
-          '\',\'' + (u.rol === 'JEFATURA' ? 'TRABAJADOR' : 'JEFATURA') + '\')">Rol → ' +
-          (u.rol === 'JEFATURA' ? 'TRABAJADOR' : 'JEFATURA') + '</button>' +
-        '<button class="accion" onclick="resetPinUsuario(\'' + esc(u.usuario_id) +
-          '\',\'' + esc(u.nombre) + '\')">Reset PIN</button>' +
+        '<button class="accion" onclick="cambiarRolUsuario(\'' + id +
+          '\',\'' + rolDestino + '\')">Rol → ' + rolDestino + '</button>' +
+        '<button class="accion" onclick="resetPinUsuario(\'' + id + '\')">Reset PIN</button>' +
         '<button class="accion" style="color:var(--err)" onclick="eliminarUsuario(\'' +
-          esc(u.usuario_id) + '\',\'' + esc(u.nombre) + '\')">Eliminar</button>' +
+          id + '\')">Eliminar</button>' +
         '</td></tr>';
     });
     document.getElementById('lista-usuarios').innerHTML = html + '</table>';
@@ -469,22 +474,24 @@ function cambiarRolUsuario(usuarioId, rol) {
       }, mostrarErrorUi);
     }, { icono: '🔁', textoAceptar: 'Cambiar rol' });
 }
-function resetPinUsuario(usuarioId, nombre) {
+function resetPinUsuario(usuarioId) {
+  var nombre = usuarioDe_(usuarioId).nombre || 'usuario';
   Ui.formulario('Restablecer PIN de ' + nombre,
     [{ id: 'pin', label: 'Nuevo PIN', tipo: 'password',
-       ayuda: 'Mínimo 4 dígitos. Comunícalo al usuario de forma segura.' }],
+       ayuda: 'Mínimo 6 dígitos. Comunícalo al usuario de forma segura.' }],
     function (v) {
-      if ((v.pin || '').trim().length < 4) return 'El PIN debe tener al menos 4 dígitos.';
+      if ((v.pin || '').trim().length < 6) return 'El PIN debe tener al menos 6 dígitos.';
       llamar('apiUsuarioResetPin', [usuarioId, v.pin], function () {
         Ui.toast('PIN restablecido para ' + nombre + '.', 'ok');
       }, mostrarErrorUi);
     }, { icono: '🔑', textoAceptar: 'Restablecer' });
 }
-function editarUsuario(usuarioId, nombreActual, identificadorActual) {
+function editarUsuario(usuarioId) {
+  var u = usuarioDe_(usuarioId);
   Ui.formulario('Editar usuario',
-    [{ id: 'nombre', label: 'Nombre', valor: nombreActual },
+    [{ id: 'nombre', label: 'Nombre', valor: u.nombre },
      { id: 'identificador', label: 'Identificador de acceso (login)',
-       valor: identificadorActual,
+       valor: u.identificador_acceso,
        ayuda: 'Se conservan las mayúsculas; para entrar no se distinguen.' }],
     function (v) {
       if (!(v.nombre || '').trim()) return 'El nombre no puede quedar vacío.';
@@ -496,7 +503,8 @@ function editarUsuario(usuarioId, nombreActual, identificadorActual) {
       }, mostrarErrorUi);
     });
 }
-function eliminarUsuario(usuarioId, nombre) {
+function eliminarUsuario(usuarioId) {
+  var nombre = usuarioDe_(usuarioId).nombre || 'usuario';
   Ui.confirmar('Eliminar usuario',
     '¿Eliminar definitivamente a "' + nombre + '"?\n\nSolo es posible si nunca ' +
     'registró movimientos (la trazabilidad conserva al responsable de cada ' +

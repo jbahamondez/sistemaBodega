@@ -50,8 +50,8 @@ var CONFIG = {
       columns: ['movimiento_id', 'tipo', 'estado', 'usuario_id',
                 'usuario_nombre_snapshot', 'fecha_hora', 'origen', 'destino',
                 'observacion', 'total_formatos', 'total_empaques',
-                'total_unidades'],
-      textColumns: ['movimiento_id', 'usuario_id']
+                'total_unidades', 'clave_idempotencia'],
+      textColumns: ['movimiento_id', 'usuario_id', 'clave_idempotencia']
     },
     MOVIMIENTO_DETALLE: {
       name: 'MovimientoDetalle',

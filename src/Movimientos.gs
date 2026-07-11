@@ -32,6 +32,12 @@
  * cantidad_empaques debe ser > 0 en ENTRADA y RETIRO. En AJUSTE y REVERSA
  * puede ser negativo (correcciones en ambos sentidos, §17).
  *
+ * datos.claveIdempotencia (opcional pero recomendado): identificador único
+ * del intento generado por el cliente al armar el carro. Si ya existe un
+ * movimiento CONFIRMADO con esa clave, se devuelve ese resultado en vez de
+ * crear otro — así un reintento tras un corte de red no duplica el
+ * movimiento (auditoría C2).
+ *
  * Devuelve { movimiento_id, tipo, total_unidades, detalles } o lanza Error
  * sin haber modificado nada.
  */
@@ -45,12 +51,21 @@ function movConfirmar_(datos) {
   }
   var usuarioId = utilTrim(datos.usuarioId) || CONFIG.USUARIO_PENDIENTE_AUTH;
   var usuarioNombre = utilTrim(datos.usuarioNombre) || usuarioId;
+  var claveIdempotencia = utilTrim(datos.claveIdempotencia);
 
   var lock = LockService.getScriptLock();
   if (!lock.tryLock(CONFIG.LOCK_TIMEOUT_MS)) {
     throw new Error('El sistema está procesando otro movimiento. Intenta nuevamente.');
   }
   try {
+    // --- 1b. Idempotencia: si este intento ya se confirmó, devolverlo -----
+    // La verificación ocurre DENTRO del lock: dos envíos simultáneos con la
+    // misma clave se serializan y el segundo encuentra al primero.
+    if (claveIdempotencia) {
+      var yaConfirmado = movBuscarPorClave_(claveIdempotencia);
+      if (yaConfirmado) return yaConfirmado;
+    }
+
     // --- 2. Releer catálogo vigente y resolver cada ítem -------------------
     var items = datos.items.map(function (item, i) {
       return movResolverItem_(item, tipo, i + 1);
@@ -108,7 +123,8 @@ function movConfirmar_(datos) {
       observacion: utilTrim(datos.observacion),
       total_formatos: items.length,
       total_empaques: totalEmpaques,
-      total_unidades: totalUnidades
+      total_unidades: totalUnidades,
+      clave_idempotencia: claveIdempotencia
     });
 
     var detalleIds = idNextBatch_('DETALLE', items.length);
@@ -179,6 +195,41 @@ function movBuscarCodigo_(codigoBarras) {
     tipo_empaque: resultado.formato.tipo_empaque,
     unidades_por_empaque: utilToInt(resultado.formato.unidades_por_empaque),
     stock_unidades: invGetStock_(resultado.producto.producto_id)
+  };
+}
+
+/**
+ * Busca un movimiento CONFIRMADO por su clave de idempotencia y reconstruye
+ * la misma respuesta que devolvió movConfirmar_ al confirmarlo. Devuelve
+ * null si esa clave no corresponde a ningún movimiento confirmado.
+ */
+function movBuscarPorClave_(claveIdempotencia) {
+  var cabecera = dbFindOne_('MOVIMIENTOS', function (m) {
+    return m.clave_idempotencia === claveIdempotencia &&
+           m.estado === CONFIG.ESTADOS_MOVIMIENTO.CONFIRMADO;
+  });
+  if (!cabecera) return null;
+
+  var detalles = dbFindWhere_('MOVIMIENTO_DETALLE', function (d) {
+    return d.movimiento_id === cabecera.movimiento_id;
+  });
+  return {
+    movimiento_id: cabecera.movimiento_id,
+    tipo: cabecera.tipo,
+    fecha_hora: cabecera.fecha_hora,
+    total_formatos: utilToInt(cabecera.total_formatos),
+    total_empaques: utilToInt(cabecera.total_empaques),
+    total_unidades: utilToInt(cabecera.total_unidades),
+    reintento: true, // señal para la UI: no es un movimiento nuevo
+    detalles: detalles.map(function (d) {
+      return {
+        producto: d.producto_nombre_snapshot,
+        formato: d.formato_nombre_snapshot,
+        cantidad_empaques: utilToInt(d.cantidad_empaques),
+        unidades: utilToInt(d.total_unidades),
+        stock_posterior: utilToInt(d.stock_posterior)
+      };
+    })
   };
 }
 

@@ -95,17 +95,36 @@ function dbAppendRow_(sheetKey, obj) {
   dbAppendRows_(sheetKey, [obj]);
 }
 
+/**
+ * Formatea un rango de datos como texto plano ('@') ANTES de escribirlo.
+ * Es la defensa unificada de dos hallazgos de auditoría:
+ *  - A1 (formula injection): en una celda de texto, Sheets NO evalúa un
+ *    valor que empiece con "=", "+", "-" o "@" (p. ej. =IMPORTRANGE en el
+ *    nombre de un producto); se guarda y se lee como texto literal.
+ *  - A3 (ceros iniciales / notación científica): Setup solo formatea las
+ *    primeras ~1000 filas del grid; formatear el rango al escribir garantiza
+ *    que TODA fila nueva —por lejos que quede— preserve los códigos exactos.
+ * El sistema ya trata todos los valores como texto al leer (utilToInt,
+ * dbCeldaATexto_), así que formatear los números como texto no cambia nada
+ * y el valor round-trippea idéntico (sin trucos de apóstrofo).
+ */
+function dbFormatearRangoTexto_(sheet, filaInicio, numFilas, numCols) {
+  sheet.getRange(filaInicio, 1, numFilas, numCols).setNumberFormat('@');
+}
+
 /** Agrega varias filas en una sola escritura (más eficiente que una a una). */
 function dbAppendRows_(sheetKey, objs) {
   if (!objs || objs.length === 0) return;
   var def = CONFIG.SHEETS[sheetKey];
   var sheet = dbGetSheet_(sheetKey);
+  var filaInicio = sheet.getLastRow() + 1;
   var values = objs.map(function (obj) {
     return def.columns.map(function (col) {
       return obj[col] === undefined || obj[col] === null ? '' : obj[col];
     });
   });
-  sheet.getRange(sheet.getLastRow() + 1, 1, values.length, def.columns.length)
+  dbFormatearRangoTexto_(sheet, filaInicio, values.length, def.columns.length);
+  sheet.getRange(filaInicio, 1, values.length, def.columns.length)
     .setValues(values);
 }
 
@@ -126,6 +145,7 @@ function dbWriteAllRows_(sheetKey, rows) {
       return obj[col] === undefined || obj[col] === null ? '' : obj[col];
     });
   });
+  dbFormatearRangoTexto_(sheet, 2, values.length, def.columns.length);
   sheet.getRange(2, 1, values.length, def.columns.length).setValues(values);
 }
 
@@ -154,7 +174,9 @@ function dbUpdateRowByIndex_(sheetKey, rowIndex, patch) {
     if (colIndex === -1) {
       throw new Error('Columna desconocida "' + col + '" en hoja ' + def.name);
     }
-    sheet.getRange(rowIndex, colIndex + 1).setValue(patch[col]);
+    var celda = sheet.getRange(rowIndex, colIndex + 1);
+    celda.setNumberFormat('@'); // texto: sin fórmulas ni pérdida de ceros (A1/A3)
+    celda.setValue(patch[col]);
   });
 }
 

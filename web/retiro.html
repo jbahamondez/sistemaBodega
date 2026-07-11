@@ -175,6 +175,11 @@
 // Borrador local (§23): el retiro en preparación no toca el stock y
 // sobrevive si se cierra el navegador. Se limpia al confirmar o cancelar.
 var carro = [];
+// Clave de idempotencia del retiro en preparación (C2): identifica este
+// intento de forma única. Si un corte de red obliga a reintentar la
+// confirmación, el servidor reconoce la clave y no duplica el movimiento.
+// Se genera al agregar el primer producto y se limpia al confirmar/cancelar.
+var claveOperacion = null;
 var cacheCodigos = {};
 var streamActual = null;
 var lectorZXing = null;
@@ -186,7 +191,7 @@ var CLAVE_BORRADOR = 'retiro_borrador_v1';
 function esc(s) {
   return String(s === null || s === undefined ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 function mensaje(texto, tipo) {
   var el = document.getElementById('mensaje');
@@ -398,6 +403,7 @@ function procesarCodigo(codigo) {
   });
 }
 function agregarAlCarro(info) {
+  if (!claveOperacion) claveOperacion = uuid(); // primer producto: nace la clave
   carro.push({
     codigo_barras: info.codigo_barras,
     producto_nombre: info.producto_nombre,
@@ -468,25 +474,32 @@ function quitarItem(indice) {
 }
 
 // ------------------------------ borrador -----------------------------------
+// El borrador guarda el carro Y la clave de idempotencia juntos, para que un
+// reintento tras recargar la página conserve la misma clave.
 function guardarBorrador() {
-  try { localStorage.setItem(CLAVE_BORRADOR, JSON.stringify(carro)); }
-  catch (e) { /* almacenamiento no disponible */ }
+  try {
+    localStorage.setItem(CLAVE_BORRADOR,
+      JSON.stringify({ carro: carro, clave: claveOperacion }));
+  } catch (e) { /* almacenamiento no disponible */ }
 }
 function restaurarBorrador() {
   try {
     var crudo = localStorage.getItem(CLAVE_BORRADOR);
-    if (crudo) {
-      var datos = JSON.parse(crudo);
-      if (datos && datos.length) {
-        carro = datos;
-        mensaje('Se restauró un retiro en preparación no confirmado.', 'ok');
-        mostrarVista('retiro');
-        renderCarro();
-      }
+    if (!crudo) return;
+    var datos = JSON.parse(crudo);
+    // Compatibilidad con el formato anterior (array de carro sin envoltorio).
+    var carroGuardado = Array.isArray(datos) ? datos : (datos && datos.carro);
+    if (carroGuardado && carroGuardado.length) {
+      carro = carroGuardado;
+      claveOperacion = (datos && datos.clave) || uuid();
+      mensaje('Se restauró un retiro en preparación no confirmado.', 'ok');
+      mostrarVista('retiro');
+      renderCarro();
     }
   } catch (e) { /* borrador corrupto: se ignora */ }
 }
 function limpiarBorrador() {
+  claveOperacion = null;
   try { localStorage.removeItem(CLAVE_BORRADOR); } catch (e) { /* sin efecto */ }
 }
 
@@ -499,6 +512,7 @@ function confirmarRetiro() {
   mensaje('Confirmando retiro…');
 
   Sesion.api('apiRetiroConfirmar', [{
+    claveIdempotencia: claveOperacion,
     items: carro.map(function (i) {
       return { codigo_barras: i.codigo_barras, cantidad_empaques: i.cantidad };
     })
@@ -510,7 +524,8 @@ function confirmarRetiro() {
         ' empaques = ' + (-d.unidades) + ' unidades';
     });
     document.getElementById('resultado-texto').textContent =
-      'RETIRO ' + r.movimiento_id + ' — ' + r.fecha_hora + '\n' +
+      (r.reintento ? 'RETIRO YA REGISTRADO (evitado duplicado) — ' : 'RETIRO ') +
+      r.movimiento_id + ' — ' + r.fecha_hora + '\n' +
       lineas.join('\n') + '\nTotal retirado: ' + r.total_unidades + ' unidades.';
     boton.disabled = false;
     boton.textContent = 'CONFIRMAR RETIRO';

@@ -44,7 +44,7 @@ function usuarioCrear_(datos) {
   if (!valIsRol(rol)) {
     throw new Error('Rol inválido. Válidos: ' + Object.keys(CONFIG.ROLES).join(', '));
   }
-  if (pin.length < 4) throw new Error('El PIN debe tener al menos 4 dígitos.');
+  if (pin.length < 6) throw new Error('El PIN debe tener al menos 6 dígitos.');
 
   if (usuarioIdentificadorEnUso_(identificador, null)) {
     throw new Error('Ya existe un usuario con identificador "' + identificador + '".');
@@ -146,7 +146,7 @@ function usuarioCambiarRol_(usuarioId, rol) {
 /** Restablece el PIN de un usuario (jefatura). */
 function usuarioResetPin_(usuarioId, nuevoPin) {
   nuevoPin = utilTrim(nuevoPin);
-  if (nuevoPin.length < 4) throw new Error('El PIN debe tener al menos 4 dígitos.');
+  if (nuevoPin.length < 6) throw new Error('El PIN debe tener al menos 6 dígitos.');
   var usuario = dbFindById_('USUARIOS', usuarioId);
   if (!usuario) throw new Error('Usuario no encontrado: ' + usuarioId);
   var salt = utilGenerateSalt();
