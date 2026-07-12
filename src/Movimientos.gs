@@ -66,9 +66,27 @@ function movConfirmar_(datos) {
       if (yaConfirmado) return yaConfirmado;
     }
 
-    // --- 2. Releer catálogo vigente y resolver cada ítem -------------------
+    // --- 2. Releer catálogo y stock vigentes UNA sola vez (M1) -------------
+    // Antes se hacían 2-3 lecturas de hoja completa POR ÍTEM (resolver el
+    // código + leer stock), alargando la confirmación y la ventana del lock
+    // linealmente con el carro. Ahora: 3 lecturas totales, resolución en
+    // memoria, sin importar cuántos ítems traiga el movimiento.
+    var formatoPorCodigo = {};
+    dbReadAll_('FORMATOS_EMPAQUE').forEach(function (f) {
+      if (utilToBool(f.activo)) formatoPorCodigo[f.codigo_barras] = f;
+    });
+    var productoPorId = {};
+    dbReadAll_('PRODUCTOS').forEach(function (p) {
+      productoPorId[p.producto_id] = p;
+    });
+    var inventarioRows = dbReadAll_('INVENTARIO');
+    var stockLeido = {};
+    inventarioRows.forEach(function (i) {
+      stockLeido[i.producto_id] = utilToInt(i.stock_unidades) || 0;
+    });
+
     var items = datos.items.map(function (item, i) {
-      return movResolverItem_(item, tipo, i + 1);
+      return movResolverItem_(item, tipo, i + 1, formatoPorCodigo, productoPorId);
     });
 
     // --- 3. Validar contra stock vigente (releído bajo el bloqueo) ---------
@@ -77,7 +95,7 @@ function movConfirmar_(datos) {
     var stockPorProducto = {};
     items.forEach(function (it) {
       if (stockPorProducto[it.producto_id] === undefined) {
-        stockPorProducto[it.producto_id] = invGetStock_(it.producto_id);
+        stockPorProducto[it.producto_id] = stockLeido[it.producto_id] || 0;
       }
     });
 
@@ -145,9 +163,25 @@ function movConfirmar_(datos) {
       };
     }));
 
+    // Inventario en LOTE (M1): se reusa la lectura hecha al entrar al lock,
+    // se mutan en memoria los productos tocados y se escribe la hoja una vez
+    // (más filas nuevas en un solo append). El stock negativo ya quedó
+    // descartado en la validación de arriba.
+    var invPorId = {};
+    inventarioRows.forEach(function (r) { invPorId[r.producto_id] = r; });
+    var invNuevos = [];
     Object.keys(stockSimulado).forEach(function (pid) {
-      invActualizarStock_(pid, stockSimulado[pid], usuarioId);
+      if (invPorId[pid]) {
+        invPorId[pid].stock_unidades = stockSimulado[pid];
+        invPorId[pid].updated_at = ahora;
+        invPorId[pid].updated_by = usuarioId;
+      } else {
+        invNuevos.push({ producto_id: pid, stock_unidades: stockSimulado[pid],
+          updated_at: ahora, updated_by: usuarioId });
+      }
     });
+    if (inventarioRows.length > 0) dbWriteAllRows_('INVENTARIO', inventarioRows);
+    if (invNuevos.length > 0) dbAppendRows_('INVENTARIO', invNuevos);
 
     dbUpdateById_('MOVIMIENTOS', movimientoId, {
       estado: CONFIG.ESTADOS_MOVIMIENTO.CONFIRMADO
@@ -233,8 +267,12 @@ function movBuscarPorClave_(claveIdempotencia) {
   };
 }
 
-/** Resuelve un ítem contra el catálogo vigente y calcula su delta en unidades. */
-function movResolverItem_(item, tipo, posicion) {
+/**
+ * Resuelve un ítem contra los mapas del catálogo vigente ya leídos por
+ * movConfirmar_ (M1: cero lecturas de hoja por ítem) y calcula su delta en
+ * unidades. Solo formatos y productos ACTIVOS son escaneables.
+ */
+function movResolverItem_(item, tipo, posicion, formatoPorCodigo, productoPorId) {
   var cantidad = utilToInt(item.cantidad_empaques);
   if (cantidad === null || cantidad === 0) {
     throw new Error('Ítem ' + posicion + ': la cantidad de empaques es inválida.');
@@ -245,22 +283,23 @@ function movResolverItem_(item, tipo, posicion) {
     throw new Error('Ítem ' + posicion + ': la cantidad debe ser mayor que 0 en ' + tipo + '.');
   }
 
-  var encontrado = catalogoBuscarPorCodigoBarras_(item.codigo_barras);
-  if (!encontrado) {
-    throw new Error('Código no registrado: "' +
-      utilNormalizeBarcode(item.codigo_barras) + '".');
+  var codigo = utilNormalizeBarcode(item.codigo_barras);
+  var formato = formatoPorCodigo[codigo]; // el mapa ya trae solo activos
+  var producto = formato ? productoPorId[formato.producto_id] : null;
+  if (!formato || !producto || !utilToBool(producto.activo)) {
+    throw new Error('Código no registrado: "' + codigo + '".');
   }
 
-  var unidadesPorEmpaque = utilToInt(encontrado.formato.unidades_por_empaque);
+  var unidadesPorEmpaque = utilToInt(formato.unidades_por_empaque);
   var signo = tipo === CONFIG.TIPOS_MOVIMIENTO.RETIRO ? -1 : 1;
   // ENTRADA/AJUSTE/REVERSA suman con el signo de la cantidad; RETIRO resta.
 
   return {
-    producto_id: encontrado.producto.producto_id,
-    producto_nombre: encontrado.producto.nombre,
-    formato_id: encontrado.formato.formato_id,
-    formato_nombre: encontrado.formato.nombre_formato,
-    codigo_barras: encontrado.formato.codigo_barras,
+    producto_id: producto.producto_id,
+    producto_nombre: producto.nombre,
+    formato_id: formato.formato_id,
+    formato_nombre: formato.nombre_formato,
+    codigo_barras: formato.codigo_barras,
     cantidad_empaques: cantidad,
     unidades_por_empaque: unidadesPorEmpaque,
     delta_unidades: signo * cantidad * unidadesPorEmpaque

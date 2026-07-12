@@ -380,3 +380,22 @@ Movimientos. La hoja de producción existente necesita el encabezado nuevo en
 la celda correspondiente (ver mensaje de despliegue); las lecturas/escrituras
 son posicionales, así que la idempotencia funciona igual, pero el encabezado
 debe añadirse para mantener `setupDatabase()` reejecutable.
+
+## D-030 — M1: confirmación de movimientos en una sola pasada de lecturas
+
+Antes, `movConfirmar_` hacía 2-3 lecturas de hoja completa POR ÍTEM dentro
+del lock (resolver cada código vía `catalogoBuscarPorCodigoBarras_` + leer
+stock por producto) y actualizaba el inventario con una lectura+escritura
+por producto: un carro de 10 ítems generaba ~25 lecturas y alargaba la
+ventana del bloqueo linealmente.
+
+Ahora, al entrar al lock se leen FORMATOS_EMPAQUE, PRODUCTOS e INVENTARIO
+UNA vez cada una; los ítems se resuelven en memoria contra esos mapas
+(`movResolverItem_` recibe los mapas, ya sin lecturas propias) y el
+inventario se actualiza en LOTE reutilizando la lectura inicial (una
+escritura total + un append para productos nuevos). Total: 3 lecturas y
+~5 escrituras fijas, sin importar el tamaño del carro.
+
+`invActualizarStock_` quedó sin usos y se eliminó (la única escritura de
+Inventario vive ahora dentro de la transacción, en lote). Comportamiento
+verificado sin cambios por las 32 pruebas existentes.

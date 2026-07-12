@@ -104,7 +104,6 @@ const projectGlobals = {
   // Inventario.gs
   invGetStock_: 'readonly',
   invListar_: 'readonly',
-  invActualizarStock_: 'readonly',
   // Movimientos.gs
   movConfirmar_: 'readonly',
   movBuscarPorClave_: 'readonly',

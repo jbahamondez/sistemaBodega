@@ -2,9 +2,10 @@
  * Inventario.gs — Estado actual del stock por producto.
  *
  * El inventario es una VISTA optimizada del estado actual: la fuente de
- * auditoría son Movimientos + MovimientoDetalle (§19). Este módulo solo lee;
- * la única escritura (invActualizarStock_) ocurre dentro de la transacción
- * de movConfirmar_, bajo bloqueo. Nada más debe modificar la hoja Inventario.
+ * auditoría son Movimientos + MovimientoDetalle (§19). Este módulo solo LEE;
+ * la única escritura de la hoja Inventario ocurre en lote dentro de la
+ * transacción de movConfirmar_ (Movimientos.gs), bajo bloqueo. Nada más debe
+ * modificarla.
  */
 
 /** Stock actual en unidades de un producto (0 si nunca tuvo movimientos). */
@@ -55,29 +56,3 @@ function invListar_() {
     });
 }
 
-/**
- * INTERNA — escribe el stock de un producto. Solo debe invocarse desde
- * movConfirmar_, dentro del bloqueo de la transacción. Crea la fila de
- * inventario si el producto nunca tuvo stock.
- */
-function invActualizarStock_(productoId, nuevoStock, usuarioId) {
-  if (nuevoStock < 0) {
-    // Defensa en profundidad: movConfirmar_ ya validó. Nunca stock negativo.
-    throw new Error('Stock negativo no permitido para ' + productoId + '.');
-  }
-  var fila = dbFindById_('INVENTARIO', productoId);
-  if (fila) {
-    dbUpdateRowByIndex_('INVENTARIO', fila._rowIndex, {
-      stock_unidades: nuevoStock,
-      updated_at: utilNow(),
-      updated_by: usuarioId
-    });
-  } else {
-    dbAppendRow_('INVENTARIO', {
-      producto_id: productoId,
-      stock_unidades: nuevoStock,
-      updated_at: utilNow(),
-      updated_by: usuarioId
-    });
-  }
-}
