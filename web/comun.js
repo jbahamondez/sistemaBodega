@@ -333,6 +333,11 @@ window.uuid = function () {
      * una única vez con el rol ya verificado (nunca con el dato cacheado).
      */
     asegurarConfirmado: function (onListo) {
+      // `pendiente` debe quedar seteada SIEMPRE (aunque este método no la
+      // use en su propio camino de éxito): si no hay sesión, se muestra el
+      // formulario de login, y al enviarlo, completar() la necesita para
+      // saber a quién avisar tras un login exitoso.
+      pendiente = { rolRequerido: null, onListo: onListo };
       var guardada = leer();
       if (!guardada || !guardada.token) { mostrarLogin(''); return; }
       confirmarConServidor(guardada.token, function () {
