@@ -366,12 +366,16 @@ window.uuid = function () {
     cerrar: function () {
       var token = datos && datos.token;
       guardar(null);
+      // Siempre vuelve al inicio (nunca recarga la pantalla actual): si el
+      // siguiente usuario en loguearse tiene otro rol, evita que choque con
+      // el control de acceso de una pantalla restringida que ya no le
+      // corresponde ver.
       if (token) {
         llamarServidor('apiLogout', [token],
-          function () { location.reload(); },
-          function () { location.reload(); });
+          function () { location.href = 'index.html'; },
+          function () { location.href = 'index.html'; });
       } else {
-        location.reload();
+        location.href = 'index.html';
       }
     }
   };

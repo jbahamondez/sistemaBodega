@@ -470,3 +470,14 @@ Fix en `web/index.html`: `a.tarjeta.solo-jefatura { display: none; }`
 ante un síntoma de "el JS parece correcto pero el efecto visual no ocurre",
 verificar primero si una regla CSS está siendo sobrescrita antes de asumir
 un bug de lógica o de timing.
+
+## D-034 — Cerrar sesión siempre vuelve al Inicio
+
+Reportado por el usuario: si cerraba sesión estando dentro de una pantalla
+restringida (p. ej. Panel, rol JEFATURA) y luego otro usuario con distinto
+rol (TRABAJADOR) iniciaba sesión ahí mismo, `Sesion.cerrar()` hacía
+`location.reload()` — recargaba la MISMA pantalla, así que el login exitoso
+chocaba de inmediato con el control de acceso de esa pantalla (mensaje "no
+tiene acceso") en vez de simplemente llevar al segundo usuario a donde sí
+puede entrar. Fix: `cerrar()` siempre navega a `index.html` tras cerrar
+sesión, sin importar desde qué pantalla se invocó.
