@@ -499,3 +499,29 @@ mientras está en `true`) y navega a `index.html` de inmediato, sin esperar
 la respuesta de `apiLogout` (que sigue enviándose, pero de forma
 "best-effort" — invalidar el token en el servidor no requiere bloquear al
 usuario).
+
+## D-036 — Alta rápida de producto al escanear un código no registrado (solo Ingreso)
+
+Pedido por el usuario: al escanear con la pistola (`ingreso.html`) un código
+que no existe en el catálogo, además de la alerta, poder crearlo ahí mismo
+sin salir a `catalogo.html`.
+
+Se limitó a `ingreso.html` (no a `retiro.html`): esa pantalla ya es
+exclusiva de JEFATURA, el mismo rol que el servidor exige para
+`apiCatalogoCrearProducto`/`apiCatalogoCrearFormato` — no hay que abrir
+ningún permiso nuevo. Extenderlo a Retiro (abierto también a TRABAJADOR)
+habría requerido decidir si ese rol puede crear catálogo, algo que el
+usuario no pidió.
+
+Alcance del formulario: solo "producto nuevo + su primer formato" (no
+selección de un producto ya existente para agregarle una variante) — cubre
+el caso típico de un código de barras totalmente nuevo. Flujo: `Ui.confirmar`
+pregunta si crear, `Ui.formulario` pide nombre/código/categoría/descripción
+del producto y nombre/tipo/unidades del formato (el código de barras es el
+ya escaneado, fijo), se llama `apiCatalogoCrearProducto` y luego
+`apiCatalogoCrearFormato` en cadena, y el resultado se agrega directo al
+carro (sin volver a escanear).
+
+Se agregó soporte de campos `tipo: 'select'` al modal genérico
+`Ui.formulario` (`web/comun.js`), que antes solo generaba `<input>` — el
+único cambio a un componente compartido; el resto vive en `ingreso.html`.

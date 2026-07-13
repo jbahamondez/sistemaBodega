@@ -223,8 +223,8 @@ function agregarEscaneo(codigo) {
   Sesion.api('apiBuscarCodigo', [codigo], function (r) {
     procesando = false;
     if (!r.encontrado) {
-      estado('✖ Código no registrado: ' + r.codigo_barras +
-        '. Créalo primero en el catálogo.', 'err');
+      estado('✖ Código no registrado: ' + r.codigo_barras + '.', 'err');
+      ofrecerAltaRapida(r.codigo_barras);
       return;
     }
     cacheCodigos[codigo] = r;
@@ -233,6 +233,69 @@ function agregarEscaneo(codigo) {
     procesando = false;
     estado('✖ Error: ' + ((err && err.message) || err), 'err');
   });
+}
+
+// --------------------- alta rápida de producto no registrado ---------------
+// Solo disponible aquí (Ingreso, exclusivo de Jefatura): crear catálogo ya
+// requiere ese rol en el servidor (apiCatalogoCrearProducto/Formato), así
+// que no hay hueco de permisos al ofrecer esto directamente al escanear.
+function ofrecerAltaRapida(codigoBarras) {
+  Ui.confirmar('Producto no registrado',
+    'El código ' + codigoBarras + ' no está en el catálogo.\n\n¿Deseas crearlo ' +
+    'ahora y agregarlo de una vez a este ingreso?',
+    function () { abrirAltaRapida(codigoBarras); },
+    { icono: '➕', textoAceptar: 'Crear producto' });
+}
+function abrirAltaRapida(codigoBarras) {
+  Ui.formulario('Nuevo producto — código ' + codigoBarras,
+    [
+      { id: 'nombre', label: 'Nombre del producto' },
+      { id: 'codigo_producto', label: 'Código de producto (opcional)' },
+      { id: 'categoria', label: 'Categoría (opcional)' },
+      { id: 'descripcion', label: 'Descripción (opcional)' },
+      { id: 'nombre_formato', label: 'Nombre del formato',
+        ayuda: 'Ej. "Caja x12", "Display x6", "Unidad".' },
+      { id: 'tipo_empaque', label: 'Tipo de empaque', tipo: 'select', valor: 'CAJA',
+        opciones: ['UNIDAD', 'CAJA', 'DISPLAY', 'OTRO'] },
+      { id: 'unidades_por_empaque', label: 'Unidades por empaque', tipo: 'number', valor: '1' }
+    ],
+    function (v) {
+      if (!(v.nombre || '').trim()) return 'El nombre del producto es obligatorio.';
+      if (!(v.nombre_formato || '').trim()) return 'El nombre del formato es obligatorio.';
+      var unidades = parseInt(v.unidades_por_empaque, 10);
+      if (!unidades || unidades < 1) {
+        return 'Las unidades por empaque deben ser un número entero positivo.';
+      }
+
+      Sesion.api('apiCatalogoCrearProducto', [{
+        nombre: v.nombre, codigo_producto: v.codigo_producto,
+        categoria: v.categoria, descripcion: v.descripcion
+      }], function (producto) {
+        Sesion.api('apiCatalogoCrearFormato', [{
+          producto_id: producto.producto_id,
+          codigo_barras: codigoBarras,
+          nombre_formato: v.nombre_formato,
+          tipo_empaque: v.tipo_empaque,
+          unidades_por_empaque: unidades
+        }], function (formato) {
+          Ui.toast('Producto creado y agregado al catálogo.', 'ok');
+          var info = {
+            codigo_barras: codigoBarras,
+            producto_nombre: producto.nombre,
+            formato_nombre: formato.nombre_formato,
+            unidades_por_empaque: unidades,
+            stock_unidades: 0
+          };
+          cacheCodigos[codigoBarras] = info;
+          agregarAlCarro(info);
+        }, function (err) {
+          estado('✖ El producto se creó, pero falló el formato: ' +
+            ((err && err.message) || err) + '. Créalo desde el catálogo.', 'err');
+        });
+      }, function (err) {
+        estado('✖ No se pudo crear el producto: ' + ((err && err.message) || err), 'err');
+      });
+    }, { icono: '📦', textoAceptar: 'Crear y agregar' });
 }
 function agregarAlCarro(info) {
   if (!claveOperacion) claveOperacion = uuid(); // primer producto: nace la clave

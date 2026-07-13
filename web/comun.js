@@ -409,9 +409,11 @@ window.Ui = (function () {
     '#ui-modal .cabecera strong{font-size:1rem}' +
     '#ui-modal .cuerpo{padding:1.1rem 1.2rem;color:#2b2b2b;font-size:.92rem;line-height:1.45}' +
     '#ui-modal label{display:block;font-size:.82rem;color:#6d4c41;margin-bottom:.75rem}' +
-    '#ui-modal input{width:100%;box-sizing:border-box;padding:.6rem .7rem;font-size:1rem;' +
-    'border:1px solid #e0d7ce;border-radius:8px;margin-top:.25rem}' +
-    '#ui-modal input:focus{outline:none;border-color:#5d4037;box-shadow:0 0 0 3px rgba(93,64,55,.15)}' +
+    '#ui-modal input,#ui-modal select{width:100%;box-sizing:border-box;padding:.6rem .7rem;' +
+    'font-size:1rem;border:1px solid #e0d7ce;border-radius:8px;margin-top:.25rem;' +
+    'font-family:inherit;background:#fff}' +
+    '#ui-modal input:focus,#ui-modal select:focus{outline:none;border-color:#5d4037;' +
+    'box-shadow:0 0 0 3px rgba(93,64,55,.15)}' +
     '#ui-modal .ayuda{font-size:.75rem;color:#757575;margin:-.45rem 0 .75rem}' +
     '#ui-modal .ui-error{color:#c62828;font-size:.85rem;min-height:1.1rem;margin:.2rem 0 0}' +
     '#ui-modal .pie{display:flex;justify-content:flex-end;gap:.5rem;padding:0 1.2rem 1.1rem}' +
@@ -487,9 +489,20 @@ window.Ui = (function () {
     formulario: function (titulo, campos, onGuardar, opciones) {
       opciones = opciones || {};
       var cuerpo = campos.map(function (c) {
-        return '<label>' + esc(c.label) +
-          '<input id="ui-campo-' + esc(c.id) + '" type="' + (c.tipo || 'text') +
-          '" value="' + esc(c.valor || '') + '" autocomplete="off"></label>' +
+        var control;
+        if (c.tipo === 'select') {
+          var opts = (c.opciones || []).map(function (op) {
+            var valorOp = (op && op.value !== undefined) ? op.value : op;
+            var etiqueta = (op && op.label !== undefined) ? op.label : op;
+            var elegido = (valorOp === c.valor) ? ' selected' : '';
+            return '<option value="' + esc(valorOp) + '"' + elegido + '>' + esc(etiqueta) + '</option>';
+          }).join('');
+          control = '<select id="ui-campo-' + esc(c.id) + '">' + opts + '</select>';
+        } else {
+          control = '<input id="ui-campo-' + esc(c.id) + '" type="' + (c.tipo || 'text') +
+            '" value="' + esc(c.valor || '') + '" autocomplete="off">';
+        }
+        return '<label>' + esc(c.label) + control + '</label>' +
           (c.ayuda ? '<p class="ayuda">' + esc(c.ayuda) + '</p>' : '');
       }).join('') + '<p class="ui-error" id="ui-form-error"></p>';
       abrirModal(opciones.icono || '✏️', titulo, cuerpo,
@@ -518,8 +531,8 @@ window.Ui = (function () {
           if (ev.key === 'Enter') { ev.preventDefault(); enviar(); }
         });
       });
-      var primero = modal.querySelector('input');
-      if (primero) { primero.focus(); primero.select(); }
+      var primero = modal.querySelector('input, select');
+      if (primero) { primero.focus(); if (primero.select) primero.select(); }
     }
   };
 })();
