@@ -772,3 +772,14 @@ todo, el orden se veía asimétrico. Se unificó todo en una sola columna con
 estilo de lista (borde inferior fino entre filas), y se movió el panel
 "Alertas de stock" ANTES de "Métricas y tendencias" en el Dashboard (pedido
 explícito: alertas primero, gráficos después).
+
+## D-046 — Botón "Volver al retiro" del escáner renombrado y despintado de rojo
+
+Reportado por el usuario: en la vista de escaneo de Retiro, el botón que
+cierra la cámara y muestra el carro ("Volver al retiro") se sentía como
+"retrocediste, te equivocaste" — y además estaba pintado en rojo (clase
+`peligro`, la misma que "Cancelar retiro"), reforzando esa sensación pese a
+ser una acción normal y frecuente (terminar de escanear para ir a revisar
+el carro). Cambiado a **"Terminar de escanear"** con estilo `principal`
+(relleno, color marca) en vez de `peligro` — visualmente ahora es la
+acción principal para avanzar, no una alerta.
