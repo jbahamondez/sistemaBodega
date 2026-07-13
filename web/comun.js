@@ -59,8 +59,6 @@ window.uuid = function () {
     '<label>PIN<input id="sesion-pin" type="password" inputmode="numeric" autocomplete="current-password"></label>' +
     '<div id="sesion-error"></div>' +
     '<button type="submit" id="sesion-boton">Entrar</button>' +
-    '<p style="text-align:center;margin:.8rem 0 0"><a href="index.html" ' +
-    'style="color:#6d4c41;font-size:.85rem">← Volver al inicio</a></p>' +
     '</form></div></div>' +
     '<div id="sesion-chip"><span id="sesion-nombre"></span>' +
     '<button type="button" id="sesion-salir">Salir</button></div>';
