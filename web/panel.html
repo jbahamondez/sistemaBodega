@@ -37,7 +37,7 @@
     margin-left: .35rem; }
   .navbar nav a.salir:hover { background: rgba(198,40,40,.4); border-color: transparent; }
 
-  .tabs { display: flex; gap: .4rem; margin: 1rem 0; flex-wrap: wrap; }
+  .tabs { display: flex; gap: .4rem; flex-wrap: wrap; }
   .tabs button { border: 1px solid var(--borde); background: #fff; padding: .55rem 1.1rem;
     border-radius: 8px 8px 0 0; cursor: pointer; font-size: .95rem; }
   .tabs button.activa { background: var(--marron); color: #fff; border-color: var(--marron); }
@@ -51,8 +51,10 @@
      vez de aplastarse en pantallas chicas. */
   .panel table { min-width: 640px; }
 
-  .refresco-bar { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
-    margin-bottom: .8rem; }
+  .tabs-bar { display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: .6rem .8rem; margin: 1rem 0; }
+  .refresco-bar { display: flex; align-items: center; gap: .6rem; }
+  .refresco-bar #ultima-actualizacion { font-size: .8rem; }
   .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
     gap: .8rem; margin-bottom: 1rem; }
   .kpi { background: #fff; border: 1px solid var(--borde); border-radius: 8px;
@@ -127,24 +129,24 @@
 </header>
 
 <main>
-  <div class="tabs">
-    <button id="tabbtn-dashboard" class="activa" onclick="mostrarTab('dashboard')">Dashboard</button>
-    <button id="tabbtn-inventario" onclick="mostrarTab('inventario')">Inventario</button>
-    <button id="tabbtn-movimientos" onclick="mostrarTab('movimientos')">Movimientos</button>
-    <button id="tabbtn-trazabilidad" onclick="mostrarTab('trazabilidad')">Trazabilidad</button>
-    <button id="tabbtn-ajustes" onclick="mostrarTab('ajustes')">Ajustes</button>
-    <button id="tabbtn-usuarios" onclick="mostrarTab('usuarios')">Usuarios</button>
-    <button id="tabbtn-configuracion" onclick="mostrarTab('configuracion')">Configuración</button>
+  <div class="tabs-bar">
+    <div class="tabs">
+      <button id="tabbtn-dashboard" class="activa" onclick="mostrarTab('dashboard')">Dashboard</button>
+      <button id="tabbtn-inventario" onclick="mostrarTab('inventario')">Inventario</button>
+      <button id="tabbtn-movimientos" onclick="mostrarTab('movimientos')">Movimientos</button>
+      <button id="tabbtn-trazabilidad" onclick="mostrarTab('trazabilidad')">Trazabilidad</button>
+      <button id="tabbtn-ajustes" onclick="mostrarTab('ajustes')">Ajustes</button>
+      <button id="tabbtn-usuarios" onclick="mostrarTab('usuarios')">Usuarios</button>
+      <button id="tabbtn-configuracion" onclick="mostrarTab('configuracion')">Configuración</button>
+    </div>
+    <div class="refresco-bar">
+      <span class="muted" id="ultima-actualizacion">Cargando…</span>
+      <button class="accion" onclick="cargarInicial()">Actualizar</button>
+    </div>
   </div>
 
   <!-- ============================ DASHBOARD ============================ -->
   <section id="tab-dashboard" class="tab activa">
-    <div class="refresco-bar">
-      <span class="muted" id="ultima-actualizacion">Cargando…</span>
-      <button class="accion" onclick="cargarInicial()">🔄 Actualizar todo</button>
-      <button class="accion" id="btn-auto-refresco" onclick="alternarAutoRefresco()">
-        ⏸ Pausar auto-actualización</button>
-    </div>
     <div class="kpis" id="kpis"><p class="muted">Cargando…</p></div>
     <div class="panel">
       <h2>Alertas de stock</h2>
@@ -299,6 +301,15 @@
         filtros (máx. 1000, por rendimiento).
       </p>
     </div>
+    <div class="panel">
+      <h2>Auto-actualización del Panel</h2>
+      <p class="muted">El Dashboard y el Inventario se refrescan solos cada
+        30 segundos, y también al volver a esta pestaña del navegador si
+        estuvo minimizada. Aplica a esos datos en cualquier pestaña del
+        Panel en la que estés, no solo en Dashboard.</p>
+      <button class="accion" id="btn-auto-refresco" onclick="alternarAutoRefresco()">
+        Pausar auto-actualización</button>
+    </div>
   </section>
 </main>
 
@@ -420,7 +431,7 @@ function alternarAutoRefresco() {
   autoRefrescoActivo = !autoRefrescoActivo;
   iniciarAutoRefresco();
   document.getElementById('btn-auto-refresco').textContent =
-    autoRefrescoActivo ? '⏸ Pausar auto-actualización' : '▶ Reanudar auto-actualización';
+    autoRefrescoActivo ? 'Pausar auto-actualización' : 'Reanudar auto-actualización';
 }
 // Si la pestaña estaba minimizada o en segundo plano y el usuario vuelve a
 // ella, refresca de inmediato en vez de esperar el próximo tick.

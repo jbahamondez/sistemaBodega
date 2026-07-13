@@ -687,3 +687,12 @@ visibilidad; un segundo clic los reanuda). `cargarInicial()` ahora también
 registra el momento de la última carga, así que CUALQUIER acción que ya la
 invocaba (guardar Configuración, confirmar un ajuste, etc.) también
 actualiza el indicador, sin duplicar lógica.
+
+Ajuste de ubicación (mismo día, feedback directo del usuario): la barra
+arriba a la izquierda del Dashboard se veía poco profesional, y el botón
+"Pausar auto-actualización" no encajaba ahí porque el auto-refresco no es
+exclusivo del Dashboard (también refresca Inventario, vía el mismo
+`apiPanelInicial`). Cambios: "Actualizado hace…" + "Actualizar" pasan a la
+derecha de la barra de pestañas (`.tabs-bar`, patrón pestañas-izquierda/
+controles-derecha), sin emoji en el botón; "Pausar auto-actualización" se
+mueve a la pestaña Configuración, junto a los demás parámetros del Panel.
