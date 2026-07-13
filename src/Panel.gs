@@ -17,10 +17,13 @@ function panelDashboard_(inventarioYaLeido) {
   inventario.forEach(function (p) {
     stockTotal += p.stock_unidades;
     if (p.stock_unidades === 0) {
-      sinStock.push({ producto_id: p.producto_id, nombre: p.nombre });
+      sinStock.push({ producto_id: p.producto_id, nombre: p.nombre,
+        categoria: p.categoria, codigo_producto: p.codigo_producto,
+        updated_at: p.updated_at });
     } else if (p.stock_unidades <= stockMinimo) {
       bajoMinimo.push({ producto_id: p.producto_id, nombre: p.nombre,
-        stock_unidades: p.stock_unidades });
+        categoria: p.categoria, codigo_producto: p.codigo_producto,
+        stock_unidades: p.stock_unidades, updated_at: p.updated_at });
     }
   });
 

@@ -562,3 +562,18 @@ la barra de lote existente, siguiendo el patrón ya establecido (D-029/A2) de
 pasar solo IDs por `onclick`, nunca texto libre. Pruebas nuevas en
 `SelfTest.gs`: `testEliminarCatalogo_` (bloqueo por stock, por movimientos,
 cascada de formatos, y resumen del lote).
+
+## D-038 — Alertas de stock del Panel como tabla ordenada
+
+Reportado por el usuario: con muchos productos agotados o bajo mínimo, la
+alerta (un párrafo con los nombres separados por coma) se volvía
+desordenada e incómoda de revisar.
+
+`panelDashboard_` ahora incluye `categoria`, `codigo_producto` y
+`updated_at` en `productos_sin_stock`/`productos_bajo_minimo` (ya estaban
+disponibles en `invListar_`, solo faltaba pasarlos). En `panel.html`,
+`tablaAlertaStock()` reemplaza el párrafo por una tabla ordenada
+alfabéticamente por nombre, con las mismas columnas que el resto de tablas
+del panel (Producto, Categoría, Código, Stock si aplica, Última
+actualización) — reutiliza los estilos de tabla ya existentes, sin CSS
+nuevo.

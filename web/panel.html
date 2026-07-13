@@ -304,6 +304,22 @@ function mostrarTab(nombre) {
   if (nombre === 'usuarios') cargarUsuarios();
   if (nombre === 'ajustes') ajusteActualizarFormatos();
 }
+function tablaAlertaStock(lista, conStock) {
+  var ordenada = lista.slice().sort(function (a, b) {
+    return (a.nombre || '').localeCompare(b.nombre || '', 'es');
+  });
+  var html = '<table><tr><th>Producto</th><th>Categoría</th><th>Código</th>' +
+    (conStock ? '<th class="num">Stock (unid.)</th>' : '') +
+    '<th>Última actualización</th></tr>';
+  ordenada.forEach(function (p) {
+    html += '<tr><td>' + esc(p.nombre) + '</td>' +
+      '<td>' + esc(p.categoria || '—') + '</td>' +
+      '<td>' + esc(p.codigo_producto || p.producto_id) + '</td>' +
+      (conStock ? '<td class="num">' + esc(p.stock_unidades) + '</td>' : '') +
+      '<td>' + esc(p.updated_at || '—') + '</td></tr>';
+  });
+  return html + '</table>';
+}
 function tablaMovimientos(movs) {
   if (!movs.length) return '<p class="muted">Sin movimientos para los filtros elegidos.</p>';
   var html = '<table><tr><th>ID</th><th>Fecha</th><th>Tipo</th><th>Responsable</th>' +
@@ -354,14 +370,14 @@ function renderDashboard(d) {
         '. Revisa la hoja de cálculo y reconcilia el stock si es necesario.</p>';
     }
     if (d.productos_sin_stock.length) {
-      alertas += '<p style="color:var(--err)"><strong>Agotados:</strong> ' +
-        d.productos_sin_stock.map(function (p) { return esc(p.nombre); }).join(', ') + '</p>';
+      alertas += '<p style="color:var(--err);font-weight:600;margin:0 0 .3rem">' +
+        '⚠ Agotados (' + d.productos_sin_stock.length + ')</p>' +
+        tablaAlertaStock(d.productos_sin_stock, false);
     }
     if (d.productos_bajo_minimo.length) {
-      alertas += '<p style="color:var(--warn)"><strong>Bajo mínimo:</strong> ' +
-        d.productos_bajo_minimo.map(function (p) {
-          return esc(p.nombre) + ' (' + p.stock_unidades + ')';
-        }).join(', ') + '</p>';
+      alertas += '<p style="color:var(--warn);font-weight:600;margin:.9rem 0 .3rem">' +
+        'Bajo mínimo (' + d.productos_bajo_minimo.length + ')</p>' +
+        tablaAlertaStock(d.productos_bajo_minimo, true);
     }
     document.getElementById('alertas').innerHTML =
       alertas || '<p class="muted">Sin alertas: todos los productos sobre el mínimo.</p>';
