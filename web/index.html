@@ -76,22 +76,19 @@
 <script src="config.js"></script>
 <script src="comun.js"></script>
 <script>
-// Cualquier rol puede entrar al inicio: el saludo se pinta al instante con
-// la sesión guardada. Pero las tarjetas administrativas SOLO se muestran
-// tras confirmar el rol con el servidor (nunca con el dato cacheado, que
-// podría estar desactivado si el rol cambió o el dispositivo se compartió).
-Sesion.asegurar(null, function (sesion) {
+// Una sola verificación con el servidor decide TODO (saludo + qué tarjetas
+// mostrar): cualquier rol puede entrar al inicio, pero las tarjetas
+// administrativas SOLO se revelan si el rol CONFIRMADO por el servidor es
+// JEFATURA — nunca con un dato cacheado en el navegador, que podría estar
+// desactualizado si el rol cambió o el dispositivo se compartió.
+Sesion.asegurarConfirmado(function (sesion) {
   document.getElementById('saludo').textContent =
     'Hola, ' + sesion.nombre + '. ¿Qué necesitas hacer?';
-});
-// Verificación SILENCIOSA (sin overlay ni mensajes): las tarjetas de
-// administración solo aparecen si el servidor confirma rol JEFATURA. Si el
-// trabajador no lo es, simplemente no pasa nada — nunca ve un aviso de
-// "acceso denegado" por visitar el inicio.
-Sesion.confirmarRolPara('JEFATURA', function () {
-  document.querySelectorAll('.solo-jefatura').forEach(function (el) {
-    el.style.display = 'block';
-  });
+  if (sesion.rol === 'JEFATURA') {
+    document.querySelectorAll('.solo-jefatura').forEach(function (el) {
+      el.style.display = 'block';
+    });
+  }
 });
 </script>
 </body>

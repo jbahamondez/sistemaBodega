@@ -321,19 +321,25 @@ window.uuid = function () {
     },
 
     /**
-     * Verificación de rol SIN efectos en la UI de sesión (sin overlay, sin
-     * mensajes de error): confirma con el servidor y ejecuta onEsRol() SOLO
-     * si el rol confirmado coincide; si no coincide o falla, simplemente no
-     * hace nada. USA ESTO para decisiones parciales dentro de una página
-     * abierta a cualquier rol (p. ej. mostrar accesos de administración en
-     * el inicio) — nunca para bloquear la página completa.
+     * Verificación ÚNICA para páginas abiertas a cualquier rol pero con
+     * contenido condicionado por rol (p. ej. el inicio: todos entran, pero
+     * las tarjetas de administración solo se muestran a JEFATURA).
+     *
+     * Reemplaza el patrón anterior de llamar asegurar(null,...) SEGUIDO de
+     * confirmarRolPara(...) — dos peticiones de red independientes que
+     * compartían las mismas variables internas (`datos`, `pendiente`) sin
+     * necesidad. Con un solo viaje al servidor se decide TODO: si no hay
+     * sesión, se pide login; si la hay, se llama onListo(datosConfirmados)
+     * una única vez con el rol ya verificado (nunca con el dato cacheado).
      */
-    confirmarRolPara: function (rolBuscado, onEsRol) {
+    asegurarConfirmado: function (onListo) {
       var guardada = leer();
-      if (!guardada || !guardada.token) return;
+      if (!guardada || !guardada.token) { mostrarLogin(''); return; }
       confirmarConServidor(guardada.token, function () {
-        if (datos.rol === rolBuscado) onEsRol();
-      }, function () { /* silencioso: no se muestra ni se decide nada */ });
+        onListo(datos);
+      }, function (mensaje) {
+        mostrarLogin(mensaje);
+      });
     },
 
     /** Llama a una función api* anteponiendo el token de la sesión. */

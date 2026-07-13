@@ -434,3 +434,20 @@ que solo interrumpe si el servidor de verdad invalida la sesión (nunca por
 un simple corte de red, D-025). Pasada la ventana, o si el rol no coincide,
 se hace la verificación completa con "Verificando acceso…" visible, como
 antes.
+
+## D-032 — Inicio: verificación de rol unificada en una sola llamada
+
+Tras D-031, el usuario reportó que un TRABAJADOR seguía viendo las
+tarjetas de administración en el inicio (aunque el acceso real a esas
+páginas ya estaba correctamente bloqueado). No se pudo confirmar un bug
+lógico concreto por lectura de código en el mecanismo anterior
+(`Sesion.asegurar(null,...)` + `Sesion.confirmarRolPara(...)`), pero ese
+patrón hacía DOS peticiones de red independientes a `apiSesionInfo` que
+compartían las mismas variables internas del módulo (`datos`, `pendiente`)
+sin necesidad — complejidad innecesaria y fuente de dudas al auditar.
+
+Se reemplaza por `Sesion.asegurarConfirmado(onListo)`: una única llamada al
+servidor decide todo lo que depende de la sesión en el inicio (saludo +
+qué tarjetas mostrar) y llama `onListo(datosConfirmados)` una sola vez, con
+el rol siempre recién confirmado. `confirmarRolPara` (el método anterior)
+queda eliminado por no tener más usos.
