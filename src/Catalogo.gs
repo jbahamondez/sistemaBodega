@@ -7,7 +7,9 @@
  * - El código de barras debe ser único entre formatos ACTIVOS.
  * - Cambiar el catálogo NUNCA modifica el stock ni el historial de
  *   movimientos (los detalles guardan snapshots).
- * - Se prefiere desactivar antes que eliminar; nunca se borra historial.
+ * - Se prefiere desactivar antes que eliminar. Eliminar (catalogoEliminar_)
+ *   solo se permite si el producto/formato NUNCA tuvo stock ni movimientos;
+ *   si los tuvo, se bloquea (nunca se borra historial) y hay que desactivar.
  * - Todo cambio queda en HistorialCatalogo.
  *
  * Nota Fase 7: el usuario responsable se registra con un placeholder hasta
@@ -296,6 +298,104 @@ function catalogoCambiarEstadoLoteProductos_(productoIds, activar, usuarioId) {
   } finally {
     lock.releaseLock();
   }
+}
+
+/**
+ * Elimina físicamente un formato de empaque. Bloquea si alguna vez apareció
+ * en un movimiento (MOVIMIENTO_DETALLE.formato_id): ahí la trazabilidad
+ * depende de que el registro exista para desambiguar (aunque los detalles ya
+ * guardan snapshots de texto, el borrado nunca es reversible). Sin
+ * movimientos, no hay ningún dato que perder.
+ */
+function catalogoEliminarFormato_(formatoId, origen, usuarioId) {
+  origen = origen || CONFIG.ORIGENES_CAMBIO.EDICION_MANUAL;
+  usuarioId = usuarioId || CONFIG.USUARIO_PENDIENTE_AUTH;
+
+  return dbConLock_(function () {
+    var formato = dbFindById_('FORMATOS_EMPAQUE', formatoId);
+    if (!formato) throw new Error('Formato no encontrado: ' + formatoId);
+
+    var tieneMovimientos = dbFindOne_('MOVIMIENTO_DETALLE', function (d) {
+      return d.formato_id === formatoId;
+    });
+    if (tieneMovimientos) {
+      throw new Error('Este formato tiene movimientos históricos y no puede ' +
+        'eliminarse (la trazabilidad conserva sus datos). Desactívalo en su lugar.');
+    }
+
+    dbDeleteRowByIndex_('FORMATOS_EMPAQUE', formato._rowIndex);
+    histRegistrar_(usuarioId, 'FORMATO', formatoId, 'eliminacion',
+      formato.nombre_formato + ' (' + formato.codigo_barras + ')', '', origen);
+    return { formato_id: formatoId, eliminado: true };
+  });
+}
+
+/**
+ * Elimina físicamente un producto y, en cascada, sus formatos de empaque —
+ * seguro porque MOVIMIENTO_DETALLE guarda producto_id Y formato_id juntos en
+ * cada detalle (§ arriba): si el producto nunca tuvo un movimiento, ninguno
+ * de sus formatos pudo tenerlo tampoco. Bloquea si tiene stock (aunque sea
+ * sin movimientos, p. ej. un ajuste manual) o movimientos históricos.
+ */
+function catalogoEliminarProducto_(productoId, origen, usuarioId) {
+  origen = origen || CONFIG.ORIGENES_CAMBIO.EDICION_MANUAL;
+  usuarioId = usuarioId || CONFIG.USUARIO_PENDIENTE_AUTH;
+
+  return dbConLock_(function () {
+    var producto = dbFindById_('PRODUCTOS', productoId);
+    if (!producto) throw new Error('Producto no encontrado: ' + productoId);
+
+    var inv = dbFindById_('INVENTARIO', productoId);
+    var stock = inv ? (utilToInt(inv.stock_unidades) || 0) : 0;
+    if (stock > 0) {
+      throw new Error('Este producto tiene ' + stock + ' unidades en stock y no ' +
+        'puede eliminarse. Desactívalo en su lugar.');
+    }
+    var tieneMovimientos = dbFindOne_('MOVIMIENTO_DETALLE', function (d) {
+      return d.producto_id === productoId;
+    });
+    if (tieneMovimientos) {
+      throw new Error('Este producto tiene movimientos históricos y no puede ' +
+        'eliminarse (la trazabilidad conserva sus datos). Desactívalo en su lugar.');
+    }
+
+    var formatos = dbFindWhere_('FORMATOS_EMPAQUE', function (f) {
+      return f.producto_id === productoId;
+    });
+    formatos.forEach(function (f) { dbDeleteRowByIndex_('FORMATOS_EMPAQUE', f._rowIndex); });
+    if (inv) dbDeleteRowByIndex_('INVENTARIO', inv._rowIndex);
+    dbDeleteRowByIndex_('PRODUCTOS', producto._rowIndex);
+
+    histRegistrar_(usuarioId, 'PRODUCTO', productoId, 'eliminacion',
+      producto.nombre + ' (' + formatos.length + ' formato(s))', '', origen);
+    return { producto_id: productoId, eliminado: true, formatos_eliminados: formatos.length };
+  });
+}
+
+/**
+ * Elimina varios productos. No usa un único lock para todo el lote (a
+ * diferencia de activar/desactivar en lote): cada producto puede bloquearse
+ * por una razón distinta (stock, movimientos), así que se procesan uno por
+ * uno y se informa cuáles se eliminaron y cuáles no, con el motivo.
+ */
+function catalogoEliminarLoteProductos_(productoIds, usuarioId) {
+  if (!productoIds || productoIds.length === 0) {
+    throw new Error('No se seleccionó ningún producto.');
+  }
+  var eliminados = [];
+  var bloqueados = [];
+  productoIds.forEach(function (id) {
+    id = utilTrim(id);
+    try {
+      catalogoEliminarProducto_(id, CONFIG.ORIGENES_CAMBIO.EDICION_MANUAL, usuarioId);
+      eliminados.push(id);
+    } catch (e) {
+      var producto = dbFindById_('PRODUCTOS', id);
+      bloqueados.push({ producto_id: id, nombre: producto ? producto.nombre : id,
+        motivo: e.message });
+    }
+  });
+  return { eliminados: eliminados.length, bloqueados: bloqueados };
 }
 
 /** Advertencia si la entidad tiene stock o movimientos históricos. */

@@ -531,3 +531,34 @@ necesario para que la pistola siga escribiendo ahí) no conocía los campos
 del modal y le quitaba el foco constantemente, impidiendo escribir en "Nombre
 del producto" y el resto. `reenfocar()` ahora también respeta cualquier
 campo dentro de `#ui-modal`.
+
+## D-037 — Eliminar (no solo desactivar) productos y formatos del catálogo
+
+Pedido por el usuario: en Catálogo, poder eliminar productos/formatos
+seleccionados (uno o varios), similar a como ya funciona "Desactivar".
+
+Diferencia clave frente a desactivar: desactivar siempre se puede forzar
+(nunca destruye datos, D-004/§8.10); eliminar es físico y definitivo, así
+que el servidor lo BLOQUEA (sin opción de forzar) si el producto/formato
+alguna vez tuvo stock o apareció en `MOVIMIENTO_DETALLE` — ahí la
+trazabilidad debe conservarse intacta. Solo procede si nunca se usó.
+
+`catalogoEliminarProducto_` elimina en cascada los formatos del producto sin
+necesidad de revisarlos por separado: `MOVIMIENTO_DETALLE` guarda
+`producto_id` Y `formato_id` en la misma fila de detalle, así que si el
+producto nunca apareció ahí, ninguno de sus formatos pudo aparecer solo.
+También limpia la fila de `INVENTARIO` (stock ya en 0, verificado antes).
+
+`catalogoEliminarLoteProductos_` (para "Eliminar seleccionados") NO usa un
+único lock para todo el lote, a diferencia de activar/desactivar en lote:
+cada producto puede bloquearse por una razón distinta, así que se procesan
+uno por uno y se informa cuáles se eliminaron y cuáles no (con motivo) —
+igual que ya hace `usuarioEliminar_` para usuarios individuales.
+
+Nuevos endpoints: `apiCatalogoEliminarProducto`, `apiCatalogoEliminarFormato`,
+`apiCatalogoEliminarLote` (los tres exigen JEFATURA). En `catalogo.html`: un
+botón "Eliminar" por fila (producto y formato) y "Eliminar seleccionados" en
+la barra de lote existente, siguiendo el patrón ya establecido (D-029/A2) de
+pasar solo IDs por `onclick`, nunca texto libre. Pruebas nuevas en
+`SelfTest.gs`: `testEliminarCatalogo_` (bloqueo por stock, por movimientos,
+cascada de formatos, y resumen del lote).

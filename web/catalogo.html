@@ -192,6 +192,7 @@
         <strong><span id="lote-cuenta">0</span> seleccionados</strong>
         <button class="accion" onclick="aplicarLote(true)">Activar seleccionados</button>
         <button class="accion" style="color:var(--err)" onclick="aplicarLote(false)">Desactivar seleccionados</button>
+        <button class="accion" style="color:var(--err)" onclick="eliminarLote()">Eliminar seleccionados</button>
         <button class="accion" onclick="limpiarSeleccion()">Limpiar</button>
       </div>
       <div id="lista-catalogo"><p class="muted">Cargando…</p></div>
@@ -343,6 +344,8 @@ function renderCatalogo() {
       '<button class="accion" onclick="abrirEditorFormato(null,\'' + esc(p.producto_id) + '\')">+ Formato</button>' +
       '<button class="accion" onclick="cambiarEstado(\'PRODUCTO\',\'' + esc(p.producto_id) + '\',' +
         (p.activo !== 'SI') + ',false)">' + (p.activo === 'SI' ? 'Desactivar' : 'Activar') + '</button>' +
+      '<button class="accion" style="color:var(--err)" onclick="eliminarUno(\'PRODUCTO\',\'' +
+        esc(p.producto_id) + '\')">Eliminar</button>' +
       '</td></tr>';
     p.formatos.forEach(function (f) {
       html += '<tr class="formato"><td></td><td>' + esc(f.nombre_formato) + '</td>' +
@@ -355,6 +358,8 @@ function renderCatalogo() {
           esc(f.producto_id) + '\')">Editar</button>' +
         '<button class="accion" onclick="cambiarEstado(\'FORMATO\',\'' + esc(f.formato_id) + '\',' +
           (f.activo !== 'SI') + ',false)">' + (f.activo === 'SI' ? 'Desactivar' : 'Activar') + '</button>' +
+        '<button class="accion" style="color:var(--err)" onclick="eliminarUno(\'FORMATO\',\'' +
+          esc(f.formato_id) + '\')">Eliminar</button>' +
         '</td></tr>';
     });
   });
@@ -393,6 +398,48 @@ function aplicarLote(activar) {
   llamar('apiCatalogoEstadoLote', [ids, activar], function (r) {
     aviso(verbo + ' en lote: ' + r.cambiados + ' cambiado(s), ' +
       r.sin_cambio + ' ya estaba(n) así.', 'ok');
+    cargarCatalogo();
+  });
+}
+
+// ------------------------------- eliminar ----------------------------------
+// A diferencia de Desactivar (siempre se puede forzar), Eliminar es
+// definitivo: el servidor lo bloquea si el producto/formato alguna vez tuvo
+// stock o movimientos (la trazabilidad nunca se borra). Aquí solo se pide
+// confirmación; el servidor decide si es seguro.
+function eliminarLote() {
+  var ids = seleccionados_();
+  if (ids.length === 0) return;
+  if (!confirm('¿Eliminar definitivamente ' + ids.length + ' producto(s) seleccionado(s)?\n\n' +
+    'Solo se eliminarán los que nunca tuvieron stock ni movimientos; el resto queda ' +
+    'igual y se informa por qué. Esta acción no se puede deshacer.')) return;
+  llamar('apiCatalogoEliminarLote', [ids], function (r) {
+    var msg = r.eliminados + ' eliminado(s).';
+    if (r.bloqueados.length > 0) {
+      msg += ' No se pudieron eliminar ' + r.bloqueados.length + ': ' +
+        r.bloqueados.map(function (b) { return b.nombre + ' (' + b.motivo + ')'; }).join('; ');
+    }
+    aviso(msg, r.bloqueados.length > 0 ? 'err' : 'ok');
+    cargarCatalogo();
+  });
+}
+function eliminarUno(entidad, id) {
+  var nombre = id;
+  if (entidad === 'PRODUCTO') {
+    var p = catalogo.filter(function (x) { return x.producto_id === id; })[0];
+    if (p) nombre = p.nombre;
+  } else {
+    var padre = catalogo.filter(function (x) {
+      return x.formatos.some(function (f) { return f.formato_id === id; });
+    })[0];
+    var f = padre ? padre.formatos.filter(function (x) { return x.formato_id === id; })[0] : null;
+    if (f) nombre = f.nombre_formato;
+  }
+  if (!confirm('¿Eliminar definitivamente "' + nombre + '"?\n\n' +
+    'Solo es posible si nunca tuvo stock ni movimientos. Esta acción no se puede deshacer.')) return;
+  var fn = entidad === 'PRODUCTO' ? 'apiCatalogoEliminarProducto' : 'apiCatalogoEliminarFormato';
+  llamar(fn, [id], function () {
+    aviso('Eliminado correctamente.', 'ok');
     cargarCatalogo();
   });
 }

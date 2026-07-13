@@ -172,7 +172,8 @@ function runMovimientoTests() {
     testCorreccionCaso6_, testImportacionCasos_, testHttpRouter_,
     testPlanillaRealChocolateria_, testGestionUsuarios_, testEstadoLote_,
     testIdempotencia_, testFormulaInjection_,
-    testAjusteReversa_, testMovLimite_, testPendientesAntiguos_];
+    testAjusteReversa_, testMovLimite_, testPendientesAntiguos_,
+    testEliminarCatalogo_];
   tests.forEach(function (t) {
     try {
       t();
@@ -868,6 +869,77 @@ function testPendientesAntiguos_() {
     'M3: detecta el EN_PROCESO antiguo');
   assert_(pendientes.every(function (m) { return m.estado === 'EN_PROCESO'; }),
     'M3: solo reporta EN_PROCESO, nunca CONFIRMADO');
+}
+
+/**
+ * Eliminar catálogo: solo procede sin stock ni movimientos; si los tiene,
+ * bloquea (nunca borra historial). El borrado de un producto elimina en
+ * cascada sus formatos (seguro: sin movimientos por producto_id, tampoco
+ * puede haberlos por formato_id — misma fila de detalle).
+ */
+function testEliminarCatalogo_() {
+  // Caso 1: formato sin movimientos se elimina sin problema.
+  var libre = catalogoCrearProducto_({ nombre: 'ELIM Libre', codigo_producto: 'ELIM-1' });
+  var formatoLibre = catalogoCrearFormato_({ producto_id: libre.producto_id,
+    codigo_barras: 'ELIM-CB-1', nombre_formato: 'Caja', tipo_empaque: 'CAJA',
+    unidades_por_empaque: 6 });
+  var rf = catalogoEliminarFormato_(formatoLibre.formato_id);
+  assert_(rf.eliminado === true, 'elimina formato sin movimientos');
+  assert_(!dbFindById_('FORMATOS_EMPAQUE', formatoLibre.formato_id),
+    'el formato ya no existe en la hoja');
+
+  // Caso 2: producto sin formatos, stock ni movimientos se elimina completo.
+  var r2 = catalogoEliminarProducto_(libre.producto_id);
+  assert_(r2.eliminado === true && r2.formatos_eliminados === 0,
+    'elimina producto sin formatos restantes');
+  assert_(!dbFindById_('PRODUCTOS', libre.producto_id), 'el producto ya no existe');
+
+  // Caso 3: producto CON movimientos (y stock) no puede eliminarse.
+  var usado = catalogoCrearProducto_({ nombre: 'ELIM Usado', codigo_producto: 'ELIM-2' });
+  catalogoCrearFormato_({ producto_id: usado.producto_id, codigo_barras: 'ELIM-CB-2',
+    nombre_formato: 'Caja', tipo_empaque: 'CAJA', unidades_por_empaque: 10 });
+  movConfirmar_({ tipo: 'AJUSTE', usuarioNombre: 'Test', observacion: 'stock inicial',
+    items: [{ codigo_barras: 'ELIM-CB-2', cantidad_empaques: 2 }] });
+  var bloqueadoPorStock = false;
+  try { catalogoEliminarProducto_(usado.producto_id); }
+  catch (e) { bloqueadoPorStock = /stock/.test(e.message); }
+  assert_(bloqueadoPorStock, 'bloquea eliminar producto con stock');
+  assert_(dbFindById_('PRODUCTOS', usado.producto_id), 'el producto sigue existiendo');
+
+  // Retirar todo el stock: ahora bloquea por MOVIMIENTOS (no por stock).
+  movConfirmar_({ tipo: 'RETIRO', usuarioNombre: 'Test',
+    items: [{ codigo_barras: 'ELIM-CB-2', cantidad_empaques: 2 }] });
+  assert_(invGetStock_(usado.producto_id) === 0, 'stock en 0 tras retirar todo');
+  var bloqueadoPorMovimientos = false;
+  try { catalogoEliminarProducto_(usado.producto_id); }
+  catch (e) { bloqueadoPorMovimientos = /movimientos históricos/.test(e.message); }
+  assert_(bloqueadoPorMovimientos, 'bloquea eliminar producto con movimientos históricos');
+
+  // El mismo formato usado tampoco puede eliminarse solo.
+  var formatoUsado = dbFindOne_('FORMATOS_EMPAQUE', function (f) {
+    return f.codigo_barras === 'ELIM-CB-2';
+  });
+  var bloqueadoFormato = false;
+  try { catalogoEliminarFormato_(formatoUsado.formato_id); }
+  catch (e) { bloqueadoFormato = /movimientos históricos/.test(e.message); }
+  assert_(bloqueadoFormato, 'bloquea eliminar formato con movimientos históricos');
+
+  // Caso 4: producto con formato (sin movimientos) elimina ambos en cascada.
+  var conFormato = catalogoCrearProducto_({ nombre: 'ELIM Cascada', codigo_producto: 'ELIM-3' });
+  var formatoCascada = catalogoCrearFormato_({ producto_id: conFormato.producto_id,
+    codigo_barras: 'ELIM-CB-3', nombre_formato: 'Display', tipo_empaque: 'DISPLAY',
+    unidades_por_empaque: 4 });
+  var r4 = catalogoEliminarProducto_(conFormato.producto_id);
+  assert_(r4.formatos_eliminados === 1, 'elimina el producto y su único formato en cascada');
+  assert_(!dbFindById_('FORMATOS_EMPAQUE', formatoCascada.formato_id),
+    'el formato en cascada ya no existe');
+
+  // Caso 5: lote informa eliminados vs bloqueados, cada uno con su motivo.
+  var loteA = catalogoCrearProducto_({ nombre: 'ELIM Lote A', codigo_producto: 'ELIM-4' });
+  var rLote = catalogoEliminarLoteProductos_([loteA.producto_id, usado.producto_id]);
+  assert_(rLote.eliminados === 1, 'lote elimina el que sí se puede');
+  assert_(rLote.bloqueados.length === 1 && rLote.bloqueados[0].producto_id === usado.producto_id,
+    'lote informa el bloqueado con su motivo');
 }
 
 /** Integración: requiere setupDatabase() ejecutado. Se omite si no lo está. */

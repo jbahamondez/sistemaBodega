@@ -180,6 +180,24 @@ function apiCatalogoEstadoLote(token, productoIds, activar) {
   return catalogoCambiarEstadoLoteProductos_(productoIds, activar, u.usuario_id);
 }
 
+/** Elimina un formato (solo si nunca tuvo movimientos; ver Catalogo.gs). */
+function apiCatalogoEliminarFormato(token, formatoId) {
+  var u = authValidar_(token, CONFIG.ROLES.JEFATURA);
+  return catalogoEliminarFormato_(formatoId, CONFIG.ORIGENES_CAMBIO.EDICION_MANUAL, u.usuario_id);
+}
+
+/** Elimina un producto y sus formatos (solo si nunca tuvo stock ni movimientos). */
+function apiCatalogoEliminarProducto(token, productoId) {
+  var u = authValidar_(token, CONFIG.ROLES.JEFATURA);
+  return catalogoEliminarProducto_(productoId, CONFIG.ORIGENES_CAMBIO.EDICION_MANUAL, u.usuario_id);
+}
+
+/** Elimina varios productos de una vez; informa cuáles no se pudieron borrar. */
+function apiCatalogoEliminarLote(token, productoIds) {
+  var u = authValidar_(token, CONFIG.ROLES.JEFATURA);
+  return catalogoEliminarLoteProductos_(productoIds, u.usuario_id);
+}
+
 function apiCatalogoExportar(token) {
   authValidar_(token, CONFIG.ROLES.JEFATURA);
   return catalogoExportarCsv_();
