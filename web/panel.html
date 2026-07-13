@@ -103,9 +103,12 @@
     th, td { padding: .55rem .5rem; }
     #detalle-mov .caja { padding: .8rem; }
   }
+  /* Oculta TODO el contenido hasta confirmar el rol con el servidor
+     (evita el destello de contenido restringido — auditoría, reporte usuario). */
+  body.gate-rol { visibility: hidden; }
 </style>
 </head>
-<body>
+<body class="gate-rol">
 <header class="navbar">
   <a class="marca" href="index.html">
     <span class="logo">🍫</span>

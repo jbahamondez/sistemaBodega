@@ -43,7 +43,13 @@ window.uuid = function () {
     'font-family:system-ui,sans-serif;font-size:.8rem;color:#4e342e;' +
     'box-shadow:0 1px 6px rgba(0,0,0,.15);display:none}' +
     '#sesion-chip button{background:none;border:none;color:#c62828;cursor:pointer;' +
-    'font-size:.8rem;padding:0 0 0 .5rem}';
+    'font-size:.8rem;padding:0 0 0 .5rem}' +
+    // La página puede llevar body.gate-rol{visibility:hidden} para evitar el
+    // destello de contenido restringido (auditoría: trabajador veía opciones
+    // de jefatura si el script tardaba en cargar). El overlay debe verse
+    // IGUAL aunque el body esté oculto: visibility no se puede "reabrir"
+    // desde un hijo salvo declarándolo explícitamente visible.
+    '#sesion-overlay,#sesion-chip{visibility:visible}';
 
   var htmlOverlay =
     '<div id="sesion-overlay"><div class="caja">' +
@@ -137,12 +143,17 @@ window.uuid = function () {
     if (pendiente.rolRequerido && datos.rol !== pendiente.rolRequerido) {
       // La sesión NO se borra: no tener el rol de una pantalla no es un
       // problema de sesión. Se ofrece volver o entrar con otra cuenta.
+      // body.gate-rol sigue oculto: el contenido restringido nunca se revela
+      // si el rol no coincide.
       mostrarLogin('Tu usuario (' + datos.rol + ') no tiene acceso a esta ' +
         'pantalla (requiere ' + pendiente.rolRequerido + '). Vuelve al ' +
         'inicio o entra con otra cuenta.');
       return;
     }
     ocultarLogin();
+    // Revela el contenido de la página (si venía oculto con gate-rol) SOLO
+    // ahora que el rol quedó confirmado — cierra el destello reportado.
+    document.body.classList.remove('gate-rol');
     pendiente.onListo(datos);
   }
 
@@ -264,19 +275,41 @@ window.uuid = function () {
     },
 
     /**
-     * Verificación de rol SIN optimismo: nunca decide con el dato guardado
-     * en el navegador (podría estar desactualizado, p. ej. si el rol
-     * cambió después de iniciar sesión, o si el dispositivo se usó antes
-     * con otra cuenta). Muestra "Verificando acceso…" y confirma con el
-     * servidor antes de mostrar la página o el aviso de "no autorizado" —
-     * una sola decisión, sin destello de contenido indebido. USA ESTO en
-     * pantallas ENTERAS restringidas por rol (Panel, Catálogo, Ingreso):
-     * si el rol confirmado no coincide, la página completa se rechaza.
+     * Verificación de rol para pantallas ENTERAS restringidas (Panel,
+     * Catálogo, Ingreso). El contenido de la página NUNCA se revela sin que
+     * el rol quede confirmado (ver body.gate-rol + completar(): cierra el
+     * destello de contenido restringido, reportado por el usuario).
+     *
+     * Para no repetir el viaje al servidor —y el overlay "Verificando…"— en
+     * cada clic entre estas pantallas durante una sesión de trabajo, si el
+     * rol ya se confirmó hace menos de CONFIANZA_MS con el servidor Y
+     * coincide con el requerido, se revela de inmediato SIN overlay; de
+     * todos modos se revalida en segundo plano (silenciosa) para detectar
+     * pronto un cambio de rol o una sesión invalidada. Pasada la ventana de
+     * confianza, o si el rol no coincide, se hace la verificación completa
+     * con "Verificando acceso…" visible.
      */
     asegurarRolConfirmado: function (rolRequerido, onListo) {
       pendiente = { rolRequerido: rolRequerido, onListo: onListo };
       var guardada = leer();
       if (!guardada || !guardada.token) { mostrarLogin(''); return; }
+
+      var CONFIANZA_MS = 2 * 60 * 1000; // 2 min: navegar entre pantallas no reverifica cada vez
+      var confirmadoHacePoco = guardada.validada &&
+        (Date.now() - guardada.validada < CONFIANZA_MS);
+      if (confirmadoHacePoco && guardada.rol === rolRequerido) {
+        datos = guardada;
+        completar(); // ya se confirmó este rol hace poco: revela sin overlay
+        // Revalidación en segundo plano: NUNCA interrumpe por un corte de red
+        // transitorio (D-025). confirmarConServidor solo pone datos en null
+        // cuando el servidor declaró la sesión realmente inválida/inactiva;
+        // un simple problema de conexión deja `datos` intacto y aquí se
+        // ignora en silencio (se reintentará en la próxima navegación).
+        confirmarConServidor(guardada.token, function () { /* refresca en silencio */ },
+          function (mensaje) { if (datos === null) mostrarLogin(mensaje); });
+        return;
+      }
+
       mostrarVerificando();
       confirmarConServidor(guardada.token, function () {
         ocultarVerificando();

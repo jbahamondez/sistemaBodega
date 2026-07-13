@@ -399,3 +399,38 @@ escritura total + un append para productos nuevos). Total: 3 lecturas y
 `invActualizarStock_` quedó sin usos y se eliminó (la única escritura de
 Inventario vive ahora dentro de la transacción, en lote). Comportamiento
 verificado sin cambios por las 32 pruebas existentes.
+
+## D-031 — Fin al destello de contenido restringido + menos "Verificando…"
+
+Reportado por el usuario: navegando entre Panel/Catálogo/Ingreso veía
+repetidamente "Identifícate para continuar / Verificando acceso…", y un
+usuario TRABAJADOR seguía observando las opciones de Jefatura.
+
+Causa raíz del segundo problema: esas tres páginas no ocultaban su
+contenido con CSS — dependían enteramente de que el script terminara de
+ejecutar y cubriera la pantalla con el overlay de verificación. En
+cualquier ventana entre "el navegador pinta el HTML" y "el script corre y
+muestra el overlay" (carga lenta del script, red débil, dispositivo lento),
+el contenido restringido (tabs, botones, pestaña Usuarios) podía pintarse
+antes de quedar tapado. La página de Inicio no tenía este problema porque
+sus tarjetas de administración ya usaban `.solo-jefatura{display:none}`
+(oculto por CSS desde el primer parseo, no depende del tiempo de ejecución
+del script).
+
+Fix — `body.gate-rol{visibility:hidden}` en el `<style>` de Panel, Catálogo
+e Ingreso (aplicado por el navegador de forma síncrona y bloqueante al
+parsear el HTML, antes de cualquier script): el contenido queda invisible
+por diseño hasta que `completar()` en `comun.js` confirma el rol correcto y
+recién ahí hace `document.body.classList.remove('gate-rol')`. El overlay de
+sesión se declara `visibility:visible` explícito para seguir viéndose sobre
+un body oculto. Cierra el hueco sin importar la velocidad de red o del
+dispositivo.
+
+Para el primer problema (nagging), `asegurarRolConfirmado` agrega una
+ventana de confianza de 2 minutos: si el rol ya se confirmó con el servidor
+hace menos de ese tiempo y coincide con el requerido, se revela el
+contenido de inmediato sin overlay, con una revalidación en segundo plano
+que solo interrumpe si el servidor de verdad invalida la sesión (nunca por
+un simple corte de red, D-025). Pasada la ventana, o si el rol no coincide,
+se hace la verificación completa con "Verificando acceso…" visible, como
+antes.
