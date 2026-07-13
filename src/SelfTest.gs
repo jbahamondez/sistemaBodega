@@ -173,7 +173,7 @@ function runMovimientoTests() {
     testPlanillaRealChocolateria_, testGestionUsuarios_, testEstadoLote_,
     testIdempotencia_, testFormulaInjection_,
     testAjusteReversa_, testMovLimite_, testPendientesAntiguos_,
-    testEliminarCatalogo_, testParametros_];
+    testEliminarCatalogo_, testParametros_, testPanelMetricas_];
   tests.forEach(function (t) {
     try {
       t();
@@ -980,6 +980,49 @@ function testParametros_() {
 
   // Restaura valores por defecto para no afectar otras pruebas del runner.
   parametrosGuardar_({ stock_minimo: 10, backup_retencion_dias: 14, mov_limite: 200 });
+}
+
+/**
+ * Métricas del Dashboard (D-044): series diarias, ranking de rotación,
+ * actividad por usuario y comparación semanal, con movimientos reales de
+ * "hoy" (los que crea movConfirmar_).
+ */
+function testPanelMetricas_() {
+  var producto = catalogoCrearProducto_({ nombre: 'MET Producto', codigo_producto: 'MET-1' });
+  catalogoCrearFormato_({ producto_id: producto.producto_id, codigo_barras: 'MET-CB-1',
+    nombre_formato: 'Caja', tipo_empaque: 'CAJA', unidades_por_empaque: 10 });
+
+  movConfirmar_({ tipo: 'ENTRADA', usuarioNombre: 'Test Metricas',
+    items: [{ codigo_barras: 'MET-CB-1', cantidad_empaques: 10 }] }); // +100
+  movConfirmar_({ tipo: 'RETIRO', usuarioNombre: 'Test Metricas',
+    items: [{ codigo_barras: 'MET-CB-1', cantidad_empaques: 3 }] }); // -30 (queda en 70)
+
+  var m = panelMetricas_(30);
+  assert_(m.movimientos_por_dia.length === 30, 'serie diaria trae exactamente 30 puntos');
+  var hoyTexto = Utilities.formatDate(new Date(), CONFIG.TIMEZONE, 'yyyy-MM-dd HH:mm:ss').slice(0, 10);
+  var hoyMovs = m.movimientos_por_dia[m.movimientos_por_dia.length - 1];
+  assert_(hoyMovs.fecha === hoyTexto, 'el último punto de la serie es hoy');
+  assert_(hoyMovs.entrada >= 100 && hoyMovs.retiro >= 30,
+    'el día de hoy suma la entrada y el retiro recién confirmados');
+
+  assert_(m.evolucion_stock.length === 30, 'evolución de stock trae 30 puntos');
+  // Es un saldo GLOBAL (todos los productos), no solo el de esta prueba —
+  // se compara contra la suma real de todo el inventario, no contra un
+  // único producto (otras pruebas del suite también crean movimientos).
+  var saldoHoy = m.evolucion_stock[m.evolucion_stock.length - 1].stock;
+  var totalStockReal = invListar_().reduce(function (sum, p) { return sum + p.stock_unidades; }, 0);
+  assert_(saldoHoy === totalStockReal,
+    'el saldo del último punto coincide con el total real de todo el inventario');
+
+  var enTop = m.top_rotacion.filter(function (p) { return p.producto === 'MET Producto'; })[0];
+  assert_(enTop && enTop.unidades >= 30, 'el producto retirado aparece en el top de rotación');
+
+  var enActividad = m.actividad_usuario.filter(function (u) { return u.usuario === 'Test Metricas'; })[0];
+  assert_(enActividad && enActividad.movimientos >= 2,
+    'la actividad del usuario cuenta la entrada y el retiro');
+
+  assert_(m.comparacion_semana.retiros_semana_actual >= 30,
+    'el retiro de hoy cuenta en la semana actual');
 }
 
 /** Integración: requiere setupDatabase() ejecutado. Se omite si no lo está. */

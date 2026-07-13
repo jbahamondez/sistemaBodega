@@ -121,6 +121,7 @@ const projectGlobals = {
   movPendientesAntiguos_: 'readonly',
   // Panel.gs
   panelDashboard_: 'readonly',
+  panelMetricas_: 'readonly',
   // Auth.gs
   authLogin_: 'readonly',
   authLogout_: 'readonly',
@@ -149,6 +150,7 @@ const projectGlobals = {
   apiIngresoConfirmar: 'readonly',
   apiAjusteConfirmar: 'readonly',
   apiPanelDashboard: 'readonly',
+  apiPanelMetricas: 'readonly',
   apiPanelInicial: 'readonly',
   apiInvListar: 'readonly',
   apiMovListar: 'readonly',

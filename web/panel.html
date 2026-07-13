@@ -61,6 +61,38 @@
     padding: .9rem 1rem; }
   .kpi strong { display: block; font-size: 1.7rem; color: var(--marron); }
   .kpi span { font-size: .82rem; color: var(--gris); }
+
+  /* --------------------------- métricas y gráficos ------------------------ */
+  .stat-tile { display: flex; align-items: baseline; flex-wrap: wrap; gap: .3rem 1rem;
+    margin-bottom: 1.2rem; padding: .8rem 1rem; background: #f9f9f7;
+    border: 1px solid var(--borde); border-radius: 8px; }
+  .stat-tile .etiqueta { font-size: .8rem; color: var(--gris); display: block; }
+  .stat-tile .valor { font-size: 1.9rem; font-weight: 700; color: var(--marron); }
+  .stat-tile .delta { font-size: .88rem; color: var(--marron-claro); }
+  .grafico-bloque { margin-bottom: 1.4rem; }
+  .grafico-bloque:last-child { margin-bottom: 0; }
+  .grafico-bloque h3 { font-size: .9rem; color: var(--marron-claro); margin: 0 0 .5rem;
+    font-weight: 600; }
+  .grafico-svg { width: 100%; height: auto; display: block; cursor: crosshair; }
+  .grafico-leyenda { display: flex; gap: 1rem; margin-bottom: .35rem; font-size: .8rem;
+    color: var(--gris); }
+  .grafico-leyenda .punto { display: inline-block; width: 9px; height: 9px;
+    border-radius: 50%; margin-right: .3rem; }
+  .graficos-dos-col { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1.4rem; }
+  @media (max-width: 720px) { .graficos-dos-col { grid-template-columns: 1fr; } }
+  #grafico-tooltip { position: fixed; display: none; z-index: 200; background: #fff;
+    border: 1px solid var(--borde); border-radius: 8px; padding: .5rem .7rem;
+    font-size: .8rem; box-shadow: 0 4px 16px rgba(0,0,0,.18); pointer-events: none;
+    max-width: 220px; line-height: 1.5; }
+  .barra-fila { display: flex; align-items: center; gap: .5rem; margin-bottom: .4rem;
+    font-size: .82rem; }
+  .barra-fila:last-child { margin-bottom: 0; }
+  .barra-fila .nombre { width: 42%; text-align: right; color: var(--marron-claro);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .barra-fila .pista { flex: 1; background: #f3ece4; border-radius: 4px; height: 16px; }
+  .barra-fila .relleno { height: 100%; border-radius: 4px; }
+  .barra-fila .valor { width: 3.4rem; font-size: .78rem; color: var(--gris);
+    text-align: right; }
   .kpi.alerta strong { color: var(--err); }
   .kpi.aviso strong { color: var(--warn); }
 
@@ -148,6 +180,30 @@
   <!-- ============================ DASHBOARD ============================ -->
   <section id="tab-dashboard" class="tab activa">
     <div class="kpis" id="kpis"><p class="muted">Cargando…</p></div>
+
+    <div class="panel">
+      <h2>Métricas y tendencias <span class="muted">(últimos 30 días)</span></h2>
+      <div class="stat-tile" id="stat-comparacion-semana"><p class="muted">Cargando…</p></div>
+      <div class="grafico-bloque">
+        <h3>Movimientos por día — Entrada vs. Retiro</h3>
+        <div id="grafico-movimientos-dia" class="grafico"><p class="muted">Cargando…</p></div>
+      </div>
+      <div class="grafico-bloque">
+        <h3>Evolución del stock total</h3>
+        <div id="grafico-evolucion-stock" class="grafico"><p class="muted">Cargando…</p></div>
+      </div>
+      <div class="graficos-dos-col">
+        <div class="grafico-bloque">
+          <h3>Top 10 productos con más rotación</h3>
+          <div id="grafico-top-rotacion" class="grafico"><p class="muted">Cargando…</p></div>
+        </div>
+        <div class="grafico-bloque">
+          <h3>Actividad por usuario</h3>
+          <div id="grafico-actividad-usuario" class="grafico"><p class="muted">Cargando…</p></div>
+        </div>
+      </div>
+    </div>
+
     <div class="panel">
       <h2>Alertas de stock</h2>
       <div id="alertas"><p class="muted">Cargando…</p></div>
@@ -313,6 +369,9 @@
   </section>
 </main>
 
+<!-- Tooltip compartido por todos los gráficos del Dashboard -->
+<div id="grafico-tooltip"></div>
+
 <!-- Modal de detalle de movimiento -->
 <div id="detalle-mov" onclick="if(event.target===this)cerrarDetalle()">
   <div class="caja">
@@ -404,6 +463,9 @@ function cargarInicial() {
     parametros = p;
     MOV_LIMITE_PANEL = p.mov_limite;
   });
+  llamar('apiPanelMetricas', [30], function (m) {
+    renderMetricas(m);
+  });
 }
 
 // --------------------------- auto-actualización -----------------------------
@@ -464,6 +526,172 @@ function guardarConfiguracion(ev) {
   });
   return false;
 }
+// -------------------------------- gráficos ----------------------------------
+// Sin librerías externas: SVG generado a mano. Paleta categórica de dos series
+// (Entrada/Retiro) validada para daltonismo con scripts/validate_palette.js
+// de la guía de dataviz (ΔE adyacente 73.6, muy por sobre el mínimo de 12).
+var PALETA_GRAFICOS = { entrada: '#2a78d6', retiro: '#1baf7a', stock: '#2a78d6',
+  rotacion: '#2a78d6', usuario: '#eb6834' };
+
+function fmtNum(n) { return Number(n || 0).toLocaleString('es-CL'); }
+
+/** Redondea un techo de eje Y a un número "limpio" (1/2/5 × potencia de 10). */
+function techoLimpio(maxValor) {
+  if (maxValor <= 0) return 10;
+  var potencia = Math.pow(10, Math.floor(Math.log10(maxValor)));
+  var normalizado = maxValor / potencia;
+  var paso = normalizado <= 1 ? 1 : normalizado <= 2 ? 2 : normalizado <= 5 ? 5 : 10;
+  return paso * potencia;
+}
+
+function mostrarGraficoTooltip(ev, html) {
+  var tip = document.getElementById('grafico-tooltip');
+  tip.innerHTML = html;
+  tip.style.display = 'block';
+  tip.style.left = (ev.clientX + 14) + 'px';
+  tip.style.top = (ev.clientY + 14) + 'px';
+}
+function ocultarGraficoTooltip() {
+  document.getElementById('grafico-tooltip').style.display = 'none';
+}
+
+/**
+ * Gráfico de líneas (1 o 2 series). etiquetas: fechas 'yyyy-MM-dd', mismo
+ * largo que cada serie.valores. Incluye leyenda (si hay 2+ series), etiqueta
+ * al final de cada línea, y un tooltip tipo "crosshair" al pasar el mouse.
+ */
+function renderGraficoLineas(contenedorId, etiquetas, series) {
+  var w = 720, h = 220;
+  var mI = 46, mD = 16, mA = 16, mB = 26;
+  var areaW = w - mI - mD, areaH = h - mA - mB;
+  var todos = [];
+  series.forEach(function (s) { todos = todos.concat(s.valores); });
+  var techo = techoLimpio(Math.max.apply(null, todos.concat([1])));
+
+  function x(i) { return mI + (etiquetas.length > 1 ? areaW * i / (etiquetas.length - 1) : areaW / 2); }
+  function y(v) { return mA + areaH - (areaH * v / techo); }
+
+  var grid = '', ejeY = '';
+  for (var p = 0; p <= 4; p++) {
+    var valor = Math.round(techo * p / 4);
+    var yy = y(valor);
+    grid += '<line x1="' + mI + '" y1="' + yy + '" x2="' + (w - mD) + '" y2="' + yy +
+      '" stroke="#e1e0d9" stroke-width="1"/>';
+    ejeY += '<text x="' + (mI - 8) + '" y="' + (yy + 4) + '" text-anchor="end" font-size="10" ' +
+      'fill="#898781">' + fmtNum(valor) + '</text>';
+  }
+
+  var marcas = '';
+  series.forEach(function (s) {
+    var puntos = s.valores.map(function (v, i) { return x(i) + ',' + y(v); }).join(' ');
+    if (series.length === 1) {
+      marcas += '<polygon points="' + mI + ',' + (mA + areaH) + ' ' + puntos + ' ' +
+        (w - mD) + ',' + (mA + areaH) + '" fill="' + s.color + '" opacity=".1"/>';
+    }
+    marcas += '<polyline points="' + puntos + '" fill="none" stroke="' + s.color +
+      '" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>';
+    var ultimoI = s.valores.length - 1;
+    marcas += '<circle cx="' + x(ultimoI) + '" cy="' + y(s.valores[ultimoI]) +
+      '" r="4" fill="' + s.color + '" stroke="#fff" stroke-width="2"/>';
+  });
+
+  var ejeX = '';
+  var salto = Math.max(1, Math.round(etiquetas.length / 6));
+  etiquetas.forEach(function (f, i) {
+    if (i % salto !== 0 && i !== etiquetas.length - 1) return;
+    ejeX += '<text x="' + x(i) + '" y="' + (h - 6) + '" text-anchor="middle" font-size="10" ' +
+      'fill="#898781">' + esc(f.slice(5).replace('-', '/')) + '</text>';
+  });
+
+  // Rectángulo transparente: única superficie que escucha mousemove (crosshair).
+  var captura = '<rect x="' + mI + '" y="' + mA + '" width="' + areaW + '" height="' + areaH +
+    '" fill="transparent"/>';
+
+  var leyenda = series.length > 1 ? '<div class="grafico-leyenda">' +
+    series.map(function (s) {
+      return '<span><span class="punto" style="background:' + s.color + '"></span>' +
+        esc(s.nombre) + '</span>';
+    }).join('') + '</div>' : '';
+
+  var cont = document.getElementById(contenedorId);
+  cont.innerHTML = leyenda + '<svg viewBox="0 0 ' + w + ' ' + h + '" class="grafico-svg">' +
+    grid + ejeY + marcas + ejeX + captura + '</svg>';
+
+  var svgEl = cont.querySelector('svg');
+  svgEl.addEventListener('mousemove', function (ev) {
+    var rect = svgEl.getBoundingClientRect();
+    var relX = (ev.clientX - rect.left) / rect.width * w;
+    var mejor = 0, mejorDist = Infinity;
+    etiquetas.forEach(function (_, i) {
+      var d = Math.abs(x(i) - relX);
+      if (d < mejorDist) { mejorDist = d; mejor = i; }
+    });
+    var detalle = series.map(function (s) {
+      return '<span style="color:' + s.color + '">●</span> ' + esc(s.nombre) + ': ' +
+        fmtNum(s.valores[mejor]);
+    }).join('<br>');
+    mostrarGraficoTooltip(ev, '<strong>' + esc(etiquetas[mejor]) + '</strong><br>' + detalle);
+  });
+  svgEl.addEventListener('mouseleave', ocultarGraficoTooltip);
+}
+
+/** Barras horizontales de una sola serie, ya ordenadas de mayor a menor. */
+function renderGraficoBarras(contenedorId, filas, color, etiquetaValor) {
+  var cont = document.getElementById(contenedorId);
+  if (!filas.length) {
+    cont.innerHTML = '<p class="muted">Sin datos en este período.</p>';
+    return;
+  }
+  var maxValor = Math.max.apply(null, filas.map(function (f) { return f.valor; }).concat([1]));
+  cont.innerHTML = filas.map(function (f) {
+    var pct = Math.max(2, Math.round((f.valor / maxValor) * 100));
+    return '<div class="barra-fila" data-nombre="' + esc(f.nombre) + '" data-valor="' +
+      f.valor + '"><span class="nombre">' + esc(f.nombre) + '</span>' +
+      '<span class="pista"><span class="relleno" style="width:' + pct + '%;background:' +
+      color + '"></span></span><span class="valor">' + fmtNum(f.valor) + '</span></div>';
+  }).join('');
+  cont.querySelectorAll('.barra-fila').forEach(function (fila) {
+    fila.addEventListener('mousemove', function (ev) {
+      mostrarGraficoTooltip(ev, '<strong>' + esc(fila.dataset.nombre) + '</strong><br>' +
+        esc(etiquetaValor) + ': ' + fmtNum(fila.dataset.valor));
+    });
+    fila.addEventListener('mouseleave', ocultarGraficoTooltip);
+  });
+}
+
+function renderComparacionSemana(c) {
+  var cambio = c.cambio_porcentual;
+  var flecha = cambio > 0 ? '▲' : cambio < 0 ? '▼' : '—';
+  document.getElementById('stat-comparacion-semana').innerHTML =
+    '<div><span class="etiqueta">Retiros esta semana</span>' +
+    '<span class="valor">' + fmtNum(c.retiros_semana_actual) + '</span> ' +
+    '<span class="muted">unidades</span></div>' +
+    '<div class="delta">' + flecha + ' ' + Math.abs(cambio) + '% vs. semana anterior (' +
+    fmtNum(c.retiros_semana_anterior) + ' unid.)</div>';
+}
+
+function renderMetricas(m) {
+  renderComparacionSemana(m.comparacion_semana);
+  renderGraficoLineas('grafico-movimientos-dia',
+    m.movimientos_por_dia.map(function (d) { return d.fecha; }), [
+      { nombre: 'Entrada', color: PALETA_GRAFICOS.entrada,
+        valores: m.movimientos_por_dia.map(function (d) { return d.entrada; }) },
+      { nombre: 'Retiro', color: PALETA_GRAFICOS.retiro,
+        valores: m.movimientos_por_dia.map(function (d) { return d.retiro; }) }
+    ]);
+  renderGraficoLineas('grafico-evolucion-stock',
+    m.evolucion_stock.map(function (d) { return d.fecha; }), [
+      { nombre: 'Stock total', color: PALETA_GRAFICOS.stock,
+        valores: m.evolucion_stock.map(function (d) { return d.stock; }) }
+    ]);
+  renderGraficoBarras('grafico-top-rotacion',
+    m.top_rotacion.map(function (p) { return { nombre: p.producto, valor: p.unidades }; }),
+    PALETA_GRAFICOS.rotacion, 'Unidades retiradas');
+  renderGraficoBarras('grafico-actividad-usuario',
+    m.actividad_usuario.map(function (u) { return { nombre: u.usuario, valor: u.movimientos }; }),
+    PALETA_GRAFICOS.usuario, 'Movimientos');
+}
+
 function renderDashboard(d) {
     document.getElementById('kpis').innerHTML =
       '<div class="kpi"><strong>' + d.total_productos + '</strong>' +

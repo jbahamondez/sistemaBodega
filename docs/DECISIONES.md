@@ -696,3 +696,47 @@ exclusivo del Dashboard (también refresca Inventario, vía el mismo
 derecha de la barra de pestañas (`.tabs-bar`, patrón pestañas-izquierda/
 controles-derecha), sin emoji en el botón; "Pausar auto-actualización" se
 mueve a la pestaña Configuración, junto a los demás parámetros del Panel.
+
+## D-044 — Gráficos y métricas en el Dashboard
+
+Pedido por el usuario: "ideas profesionales" de gráficos para el Dashboard.
+Se usó la guía interna de dataviz (paleta categórica validada contra
+daltonismo con `scripts/validate_palette.js` antes de usarla — ΔE adyacente
+73.6, muy por sobre el mínimo de 12). Tras dos rondas de ideas, se eligieron
+cinco vistas: Movimientos por día (Entrada vs Retiro, línea de 30 días),
+Top 10 productos con más rotación (barras), Evolución del stock total
+(línea), Actividad por usuario (barras) y Comparación semana actual vs.
+anterior (tarjeta KPI con flecha, sin connotación de "bueno/malo" — más
+retiro no es necesariamente positivo ni negativo). Se descartó a propósito
+un gráfico de torta por tipo de movimiento (4 categorías: las tarjetas KPI
+ya existentes comunican lo mismo mejor).
+
+Backend: `panelMetricas_(dias)` en `Panel.gs` (nuevo), expuesto vía
+`apiPanelMetricas` — con **dos bugs reales corregidos durante las pruebas
+locales, antes de llegar a producción**:
+
+1. `MOVIMIENTOS.total_unidades` (cabecera) es una **magnitud absoluta**
+   (`Math.abs` de cada ítem sumado, ver `movConfirmar_`) — un RETIRO
+   también lo guarda positivo. El signo real para reconstruir un saldo
+   acumulado vive en `MOVIMIENTO_DETALLE.total_unidades` por ítem (D-039 ya
+   lo había documentado para la reversa, pero no se aplicó aquí a la
+   primera). La evolución de stock ahora se calcula sumando los detalles
+   (`deltaSignadoPorMovimiento`), no la cabecera — si no, el stock
+   reconstruido solo podía subir, nunca bajar.
+2. El mock local de pruebas (`scripts/entorno-gas.js`) **ignora el formato
+   pedido** en `Utilities.formatDate` y siempre devuelve fecha+hora
+   completa — con formato `'yyyy-MM-dd'` las fechas traían la hora pegada y
+   nunca calzaban con los buckets diarios. Fix: pedir el formato largo y
+   recortar con `.slice(0,10)`, igual que ya se hace en el resto del
+   archivo — funciona contra la API real y contra el mock por igual.
+
+Ambos se encontraron con `testPanelMetricas_` (datos reales vía
+`movConfirmar_`) más un script de depuración puntual que imprimió los
+valores intermedios — no se detectaron por inspección de código.
+
+Frontend: gráficos SVG hechos a mano en `web/panel.html` (sin librerías
+externas) — líneas con leyenda, etiqueta al final, tooltip tipo
+"crosshair"; barras horizontales con tooltip por fila. Un solo
+`#grafico-tooltip` compartido por todos los gráficos. Se agregan a
+`cargarInicial()`, así que el auto-refresco (D-043) también los mantiene al
+día.

@@ -106,6 +106,12 @@ function apiPanelDashboard(token) {
   return panelDashboard_();
 }
 
+/** Métricas para los gráficos del Dashboard (D-044). */
+function apiPanelMetricas(token, dias) {
+  authValidar_(token, CONFIG.ROLES.JEFATURA);
+  return panelMetricas_(dias);
+}
+
 /**
  * Carga inicial del panel en UNA llamada (rendimiento): dashboard e
  * inventario juntos, reutilizando la misma lectura de inventario.

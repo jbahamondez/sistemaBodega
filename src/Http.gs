@@ -52,7 +52,8 @@ function httpFunciones_() {
     apiCatalogoEliminarProducto: apiCatalogoEliminarProducto,
     apiCatalogoEliminarLote: apiCatalogoEliminarLote,
     apiConfigObtener: apiConfigObtener,
-    apiConfigGuardar: apiConfigGuardar
+    apiConfigGuardar: apiConfigGuardar,
+    apiPanelMetricas: apiPanelMetricas
   };
 }
 
