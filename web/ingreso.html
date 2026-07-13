@@ -178,9 +178,13 @@ function estado(mensaje, tipo) {
 // La pistola escribe como teclado: el campo debe estar SIEMPRE enfocado.
 var campo = document.getElementById('escaneo');
 function reenfocar() {
-  // No robar el foco si el usuario está editando una cantidad u observación.
+  // No robar el foco si el usuario está editando una cantidad, la
+  // observación, o cualquier campo dentro de un modal (p. ej. el de alta
+  // rápida de producto): sin esta excepción, el reenfoque periódico le
+  // arrebataba el foco a esos campos cada 800 ms, impidiendo escribir ahí.
   var activo = document.activeElement;
-  if (activo && (activo.classList.contains('cantidad') || activo.id === 'observacion')) return;
+  if (activo && (activo.classList.contains('cantidad') || activo.id === 'observacion' ||
+    (activo.closest && activo.closest('#ui-modal')))) return;
   campo.focus();
 }
 setInterval(reenfocar, 800);

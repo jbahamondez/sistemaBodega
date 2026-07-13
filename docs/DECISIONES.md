@@ -525,3 +525,9 @@ carro (sin volver a escanear).
 Se agregó soporte de campos `tipo: 'select'` al modal genérico
 `Ui.formulario` (`web/comun.js`), que antes solo generaba `<input>` — el
 único cambio a un componente compartido; el resto vive en `ingreso.html`.
+
+Bug encontrado al probar: el reenfoque periódico de `#escaneo` (cada 800 ms,
+necesario para que la pistola siga escribiendo ahí) no conocía los campos
+del modal y le quitaba el foco constantemente, impidiendo escribir en "Nombre
+del producto" y el resto. `reenfocar()` ahora también respeta cualquier
+campo dentro de `#ui-modal`.
