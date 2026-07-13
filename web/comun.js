@@ -72,8 +72,12 @@ window.uuid = function () {
 
   // ------------------------------ estado -----------------------------------
   var CLAVE = 'sesion_bodega_v1';
-  var datos = null;      // { token, usuario_id, nombre, rol }
-  var pendiente = null;  // { rolRequerido, onListo }
+  var datos = null;          // { token, usuario_id, nombre, rol }
+  var pendiente = null;      // { rolRequerido, onListo }
+  var cerrandoSesion = false; // true durante Sesion.cerrar(): silencia avisos
+  // de revalidaciones en segundo plano que aún estaban en vuelo (podrían
+  // responder "Sesión expirada" justo porque el logout ya invalidó el token,
+  // no porque la sesión haya expirado por sí sola).
 
   function leer() {
     try { return JSON.parse(localStorage.getItem(CLAVE) || 'null'); }
@@ -267,7 +271,8 @@ window.uuid = function () {
         var msg = (err && err.message) || '';
         // Solo se descarta la sesión si el SERVIDOR dice que es inválida;
         // los errores transitorios de red no borran nada.
-        if (msg.indexOf('Sesión expirada') !== -1 || msg.indexOf('inactivo') !== -1) {
+        if (!cerrandoSesion &&
+          (msg.indexOf('Sesión expirada') !== -1 || msg.indexOf('inactivo') !== -1)) {
           guardar(null);
           mostrarLogin('La sesión expiró. Vuelve a entrar.');
         }
@@ -306,7 +311,7 @@ window.uuid = function () {
         // un simple problema de conexión deja `datos` intacto y aquí se
         // ignora en silencio (se reintentará en la próxima navegación).
         confirmarConServidor(guardada.token, function () { /* refresca en silencio */ },
-          function (mensaje) { if (datos === null) mostrarLogin(mensaje); });
+          function (mensaje) { if (datos === null && !cerrandoSesion) mostrarLogin(mensaje); });
         return;
       }
 
@@ -365,18 +370,16 @@ window.uuid = function () {
 
     cerrar: function () {
       var token = datos && datos.token;
+      cerrandoSesion = true;
       guardar(null);
-      // Siempre vuelve al inicio (nunca recarga la pantalla actual): si el
-      // siguiente usuario en loguearse tiene otro rol, evita que choque con
-      // el control de acceso de una pantalla restringida que ya no le
-      // corresponde ver.
-      if (token) {
-        llamarServidor('apiLogout', [token],
-          function () { location.href = 'index.html'; },
-          function () { location.href = 'index.html'; });
-      } else {
-        location.href = 'index.html';
-      }
+      // apiLogout es "avisar al servidor" (best-effort): no bloquea la
+      // navegación. Esperar su respuesta antes de navegar le daba tiempo a
+      // una revalidación en segundo plano ya en vuelo (asegurar/
+      // asegurarRolConfirmado de la pantalla actual) para responder
+      // "Sesión expirada" justo cuando el logout invalidó el token —
+      // mostrando ese aviso por error antes de llegar al Inicio.
+      if (token) llamarServidor('apiLogout', [token], function () {}, function () {});
+      location.href = 'index.html';
     }
   };
 })();

@@ -481,3 +481,21 @@ chocaba de inmediato con el control de acceso de esa pantalla (mensaje "no
 tiene acceso") en vez de simplemente llevar al segundo usuario a donde sí
 puede entrar. Fix: `cerrar()` siempre navega a `index.html` tras cerrar
 sesión, sin importar desde qué pantalla se invocó.
+
+## D-035 — Cerrar sesión no debe mostrar "La sesión expiró"
+
+Reportado por el usuario: tras D-034, al cerrar sesión aparecía en el login
+el aviso "La sesión expiró. Vuelve a entrar." — engañoso, porque no era una
+expiración real sino un cierre de sesión voluntario. Causa: `cerrar()`
+esperaba la respuesta de `apiLogout` antes de navegar; mientras tanto, una
+revalidación en segundo plano ya en vuelo (la de `asegurar`/
+`asegurarRolConfirmado` de la pantalla donde se estaba) podía responder
+justo en esa ventana, viendo el token recién invalidado por el logout y
+reportando "Sesión expirada" — mensaje técnicamente cierto pero fuera de
+lugar para un cierre de sesión intencional.
+
+Fix: `cerrar()` marca un flag `cerrandoSesion` (silencia esos avisos
+mientras está en `true`) y navega a `index.html` de inmediato, sin esperar
+la respuesta de `apiLogout` (que sigue enviándose, pero de forma
+"best-effort" — invalidar el token en el servidor no requiere bloquear al
+usuario).
