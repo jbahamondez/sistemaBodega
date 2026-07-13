@@ -73,6 +73,18 @@
   .grafico-bloque:last-child { margin-bottom: 0; }
   .grafico-bloque h3 { font-size: .9rem; color: var(--marron-claro); margin: 0 0 .5rem;
     font-weight: 600; }
+  /* Acordeón: el título es el botón que pliega/despliega (D-045). El estado
+     colapsado solo oculta el contenido — el título sigue siempre visible,
+     para no "perder" un gráfico de vista. */
+  .grafico-titulo { cursor: pointer; user-select: none; display: flex;
+    align-items: center; gap: .3rem; }
+  .grafico-titulo:hover { color: var(--marron); }
+  .grafico-titulo .flecha { display: inline-block; font-size: .75rem;
+    transition: transform .15s; }
+  .grafico-bloque.colapsado .flecha { transform: rotate(-90deg); }
+  .grafico-bloque.colapsado > .grafico,
+  .grafico-bloque.colapsado > .stat-tile { display: none; }
+  .grafico-bloque.colapsado { margin-bottom: .5rem; }
   .grafico-svg { width: 100%; height: auto; display: block; cursor: crosshair; }
   .grafico-leyenda { display: flex; gap: 1rem; margin-bottom: .35rem; font-size: .8rem;
     color: var(--gris); }
@@ -183,22 +195,30 @@
 
     <div class="panel">
       <h2>Métricas y tendencias <span class="muted">(últimos 30 días)</span></h2>
-      <div class="stat-tile" id="stat-comparacion-semana"><p class="muted">Cargando…</p></div>
-      <div class="grafico-bloque">
-        <h3>Movimientos por día — Entrada vs. Retiro</h3>
+      <div class="grafico-bloque" data-grafico-id="comparacion-semana">
+        <h3 class="grafico-titulo" onclick="alternarGrafico(this)">
+          <span class="flecha">▾</span> Comparación semana actual vs. anterior</h3>
+        <div class="stat-tile" id="stat-comparacion-semana"><p class="muted">Cargando…</p></div>
+      </div>
+      <div class="grafico-bloque" data-grafico-id="movimientos-dia">
+        <h3 class="grafico-titulo" onclick="alternarGrafico(this)">
+          <span class="flecha">▾</span> Movimientos por día — Entrada vs. Retiro</h3>
         <div id="grafico-movimientos-dia" class="grafico"><p class="muted">Cargando…</p></div>
       </div>
-      <div class="grafico-bloque">
-        <h3>Evolución del stock total</h3>
+      <div class="grafico-bloque" data-grafico-id="evolucion-stock">
+        <h3 class="grafico-titulo" onclick="alternarGrafico(this)">
+          <span class="flecha">▾</span> Evolución del stock total</h3>
         <div id="grafico-evolucion-stock" class="grafico"><p class="muted">Cargando…</p></div>
       </div>
       <div class="graficos-dos-col">
-        <div class="grafico-bloque">
-          <h3>Top 10 productos con más rotación</h3>
+        <div class="grafico-bloque" data-grafico-id="top-rotacion">
+          <h3 class="grafico-titulo" onclick="alternarGrafico(this)">
+            <span class="flecha">▾</span> Top 10 productos con más rotación</h3>
           <div id="grafico-top-rotacion" class="grafico"><p class="muted">Cargando…</p></div>
         </div>
-        <div class="grafico-bloque">
-          <h3>Actividad por usuario</h3>
+        <div class="grafico-bloque" data-grafico-id="actividad-usuario">
+          <h3 class="grafico-titulo" onclick="alternarGrafico(this)">
+            <span class="flecha">▾</span> Actividad por usuario</h3>
           <div id="grafico-actividad-usuario" class="grafico"><p class="muted">Cargando…</p></div>
         </div>
       </div>
@@ -526,6 +546,30 @@ function guardarConfiguracion(ev) {
   });
   return false;
 }
+// ------------------------ acordeón de gráficos (D-045) ----------------------
+// Plegar/desplegar es una preferencia personal de visualización, no una
+// regla de negocio: se guarda por navegador (localStorage), no en
+// Configuración/la base de datos — cada quien arma su Dashboard sin afectar
+// a los demás usuarios. El título del gráfico siempre queda visible aunque
+// esté plegado, para no "perder" el gráfico de vista.
+var CLAVE_GRAFICO_COLAPSADO = 'panel_grafico_colapsado_';
+function alternarGrafico(headerEl) {
+  var bloque = headerEl.closest('.grafico-bloque');
+  var id = bloque.dataset.graficoId;
+  var colapsado = bloque.classList.toggle('colapsado');
+  try {
+    localStorage.setItem(CLAVE_GRAFICO_COLAPSADO + id, colapsado ? '1' : '0');
+  } catch (e) { /* sin almacenamiento: el estado no persiste entre sesiones */ }
+}
+function restaurarEstadoGraficos() {
+  document.querySelectorAll('.grafico-bloque[data-grafico-id]').forEach(function (bloque) {
+    var guardado = null;
+    try { guardado = localStorage.getItem(CLAVE_GRAFICO_COLAPSADO + bloque.dataset.graficoId); }
+    catch (e) { /* sin almacenamiento: siempre queda desplegado */ }
+    if (guardado === '1') bloque.classList.add('colapsado');
+  });
+}
+
 // -------------------------------- gráficos ----------------------------------
 // Sin librerías externas: SVG generado a mano. Paleta categórica de dos series
 // (Entrada/Retiro) validada para daltonismo con scripts/validate_palette.js
@@ -1167,6 +1211,7 @@ function cargarTrazabilidad() {
 // -------------------------------- arranque ---------------------------------
 // El panel es exclusivo de jefatura (§12.4); el servidor revalida cada llamada.
 Sesion.asegurarRolConfirmado('JEFATURA', function () {
+  restaurarEstadoGraficos();
   cargarInicial();
   iniciarAutoRefresco();
 });

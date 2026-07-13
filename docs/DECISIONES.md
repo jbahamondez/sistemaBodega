@@ -740,3 +740,22 @@ externas) — líneas con leyenda, etiqueta al final, tooltip tipo
 `#grafico-tooltip` compartido por todos los gráficos. Se agregan a
 `cargarInicial()`, así que el auto-refresco (D-043) también los mantiene al
 día.
+
+## D-045 — Acordeón para plegar/desplegar cada gráfico del Dashboard
+
+Pedido por el usuario: poder ocultar los gráficos que no le interesan.
+Se plantearon dos caminos: casillas en la pestaña Configuración (control
+centralizado, pero requiere salir del Dashboard para cambiarlo y el
+gráfico desaparece del todo hasta acordarse de reactivarlo ahí), o un
+acordeón directo en el Dashboard (clic en el título pliega/despliega ahí
+mismo). El usuario eligió el acordeón.
+
+Se guarda en `localStorage` (clave `panel_grafico_colapsado_<id>`), no en
+Configuración/la base de datos: es una preferencia personal de
+visualización (qué quiero ver YO en mi pantalla), no una regla de negocio
+como el stock mínimo — cada quien arma su Dashboard sin afectar a los
+demás usuarios de Jefatura. El título de cada gráfico (con una flechita que
+rota) siempre queda visible aunque esté plegado, para no "perder" el
+gráfico de vista — solo se oculta el contenido (`.grafico-bloque.colapsado
+> .grafico` / `> .stat-tile`). Cubre las 5 vistas de D-044, incluida la
+tarjeta de comparación semanal (que ahora también lleva su propio título).
