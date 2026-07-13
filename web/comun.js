@@ -423,7 +423,11 @@ window.Ui = (function () {
     '#ui-modal button.peligro{background:#c62828;color:#fff;border:none;font-weight:600}' +
     '#ui-modal button.cancelar{background:#fff;color:#4e342e;border:1px solid #e0d7ce}' +
     '#ui-modal button.cancelar:hover{background:#faf6f1}' +
-    '#ui-toast{position:fixed;top:.9rem;right:.9rem;z-index:130;max-width:380px;' +
+    // Snackbar inferior centrado: se ubica bien arriba del borde inferior
+    // (4.5rem) para no superponerse nunca con #sesion-chip, que vive abajo
+    // a la derecha.
+    '#ui-toast{position:fixed;bottom:4.5rem;left:50%;transform:translateX(-50%);' +
+    'z-index:130;max-width:380px;' +
     'padding:.75rem 1rem;border-radius:10px;font-family:system-ui,sans-serif;' +
     'font-size:.9rem;display:none;white-space:pre-wrap;' +
     'box-shadow:0 4px 16px rgba(0,0,0,.28);animation:ui-pop .16s ease-out}' +

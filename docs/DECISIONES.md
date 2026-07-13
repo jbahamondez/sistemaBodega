@@ -651,3 +651,18 @@ Fix estructural: `scripts/check-whitelist.js` (nuevo, corre en
 `npm run check`) escanea `Api.gs` en busca de toda función `apiXxx` y falla
 si alguna no aparece en la whitelist de `Http.gs` — para que este bug ya no
 pueda pasar desapercibido.
+
+## D-042 — Toast de confirmación: snackbar inferior centrado
+
+Pedido por el usuario: mover el aviso verde (`Ui.toast`) de arriba a la
+derecha hacia abajo. Se descartó "abajo a la derecha" tal cual porque ahí
+ya vive `#sesion-chip` (la píldora "Nombre (Rol) · Salir") y quedarían
+superpuestos. El usuario eligió, entre varias alternativas con vista
+previa, un snackbar inferior centrado (estilo Material Design).
+
+`#ui-toast` en `web/comun.js`: de `top:.9rem;right:.9rem` a
+`bottom:4.5rem;left:50%;transform:translateX(-50%)` — el offset de 4.5rem
+(en vez de uno más ajustado) es a propósito para no acercarse nunca a
+`#sesion-chip`, sin importar el ancho de pantalla. Sin cambios de
+comportamiento (mismo `Ui.toast(mensaje, tipo)`, misma animación), solo
+posición.
