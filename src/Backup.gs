@@ -12,7 +12,6 @@
  */
 
 var BACKUP_CARPETA_NOMBRE = 'Respaldos - Sistema Bodega';
-var BACKUP_RETENCION_DIAS = 14;
 var BACKUP_FUNCION_DISPARADOR = 'backupEjecutar_';
 
 /** Nombre del archivo de respaldo para una fecha dada (yyyy-MM-dd). */
@@ -46,11 +45,12 @@ function backupEjecutar_() {
     existentes.push({ archivo: f, nombre: f.getName(), creadoEn: f.getDateCreated() });
   }
 
-  var vencidos = backupVencidos_(existentes, ahora, BACKUP_RETENCION_DIAS);
+  var retencionDias = parametrosObtener_().backup_retencion_dias;
+  var vencidos = backupVencidos_(existentes, ahora, retencionDias);
   vencidos.forEach(function (v) { v.archivo.setTrashed(true); });
 
   Logger.log('Respaldo creado: "' + backupNombreArchivo_(fechaTexto) + '". ' +
-    'Eliminados por retención (' + BACKUP_RETENCION_DIAS + ' días): ' + vencidos.length);
+    'Eliminados por retención (' + retencionDias + ' días): ' + vencidos.length);
 }
 
 /** Carpeta de respaldos en Drive, creándola si no existe todavía. */
@@ -75,6 +75,7 @@ function setupInstalarRespaldoDiario() {
   }
   ScriptApp.newTrigger(BACKUP_FUNCION_DISPARADOR).timeBased().everyDays(1).atHour(3).create();
   Logger.log('Disparador de respaldo diario instalado (carpeta "' +
-    BACKUP_CARPETA_NOMBRE + '", retención ' + BACKUP_RETENCION_DIAS + ' días).');
+    BACKUP_CARPETA_NOMBRE + '", retención ' + parametrosObtener_().backup_retencion_dias +
+    ' días).');
   return 'INSTALADO';
 }

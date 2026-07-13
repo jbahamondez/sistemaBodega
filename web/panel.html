@@ -132,6 +132,7 @@
     <button id="tabbtn-trazabilidad" onclick="mostrarTab('trazabilidad')">Trazabilidad</button>
     <button id="tabbtn-ajustes" onclick="mostrarTab('ajustes')">Ajustes</button>
     <button id="tabbtn-usuarios" onclick="mostrarTab('usuarios')">Usuarios</button>
+    <button id="tabbtn-configuracion" onclick="mostrarTab('configuracion')">Configuración</button>
   </div>
 
   <!-- ============================ DASHBOARD ============================ -->
@@ -266,6 +267,31 @@
       <div id="lista-usuarios"><p class="muted">Cargando…</p></div>
     </div>
   </section>
+
+  <!-- =========================== CONFIGURACIÓN ========================== -->
+  <section id="tab-configuracion" class="tab">
+    <div class="panel">
+      <h2>Parámetros del sistema</h2>
+      <p class="muted">Distinto de la pestaña "Ajustes" (que corrige cantidades de
+        stock): esto cambia el comportamiento general del sistema.</p>
+      <form class="filtros" onsubmit="return guardarConfiguracion(event)">
+        <label>Stock mínimo (alerta "bajo mínimo")
+          <input type="number" id="cfg-stock-minimo" min="0" required></label>
+        <label>Días de retención de respaldos
+          <input type="number" id="cfg-backup-retencion" min="1" required></label>
+        <label>Tope de movimientos en listados
+          <input type="number" id="cfg-mov-limite" min="1" max="1000" required></label>
+        <button type="submit" class="primario">Guardar cambios</button>
+      </form>
+      <p class="muted" style="margin-top:.8rem">
+        El stock mínimo controla cuándo un producto aparece en "Bajo mínimo" en el
+        Dashboard. La retención de respaldos son los días que se conservan las
+        copias automáticas de la planilla en Drive antes de eliminarse. El tope
+        de movimientos limita cuántos se traen de una vez en listados sin
+        filtros (máx. 1000, por rendimiento).
+      </p>
+    </div>
+  </section>
 </main>
 
 <!-- Modal de detalle de movimiento -->
@@ -298,13 +324,14 @@ function llamar(fn, args, onOk, onErr) {
   Sesion.api(fn, args, onOk, onErr);
 }
 function mostrarTab(nombre) {
-  ['dashboard', 'inventario', 'movimientos', 'trazabilidad', 'ajustes', 'usuarios']
-    .forEach(function (t) {
+  ['dashboard', 'inventario', 'movimientos', 'trazabilidad', 'ajustes', 'usuarios',
+    'configuracion'].forEach(function (t) {
       document.getElementById('tab-' + t).classList.toggle('activa', t === nombre);
       document.getElementById('tabbtn-' + t).classList.toggle('activa', t === nombre);
     });
   if (nombre === 'usuarios') cargarUsuarios();
   if (nombre === 'ajustes') ajusteActualizarFormatos();
+  if (nombre === 'configuracion') cargarConfiguracion();
 }
 function tablaAlertaStock(lista, conStock) {
   var ordenada = lista.slice().sort(function (a, b) {
@@ -347,6 +374,38 @@ function cargarInicial() {
     renderInventario();
     poblarSelectsProducto();
   });
+  // Trae el tope real de movimientos configurado (por defecto MOV_LIMITE_PANEL
+  // hasta que responda), para que el aviso de "mostrando los N más recientes"
+  // no quede desincronizado si alguien lo cambió en Configuración.
+  llamar('apiConfigObtener', [], function (p) {
+    parametros = p;
+    MOV_LIMITE_PANEL = p.mov_limite;
+  });
+}
+
+// ----------------------------- configuración -------------------------------
+var parametros = { stock_minimo: 10, backup_retencion_dias: 14, mov_limite: 200 };
+function cargarConfiguracion() {
+  llamar('apiConfigObtener', [], function (p) {
+    parametros = p;
+    document.getElementById('cfg-stock-minimo').value = p.stock_minimo;
+    document.getElementById('cfg-backup-retencion').value = p.backup_retencion_dias;
+    document.getElementById('cfg-mov-limite').value = p.mov_limite;
+  });
+}
+function guardarConfiguracion(ev) {
+  ev.preventDefault();
+  llamar('apiConfigGuardar', [{
+    stock_minimo: document.getElementById('cfg-stock-minimo').value,
+    backup_retencion_dias: document.getElementById('cfg-backup-retencion').value,
+    mov_limite: document.getElementById('cfg-mov-limite').value
+  }], function (p) {
+    parametros = p;
+    MOV_LIMITE_PANEL = p.mov_limite;
+    Ui.toast('Configuración guardada.', 'ok');
+    cargarInicial(); // el dashboard refleja el nuevo stock mínimo de inmediato
+  });
+  return false;
 }
 function renderDashboard(d) {
     document.getElementById('kpis').innerHTML =
@@ -588,7 +647,10 @@ function corregirRetiro() {
 }
 
 // ------------------------------ movimientos --------------------------------
-var MOV_LIMITE_PANEL = 200; // debe coincidir con MOV_LIMITE_DEFAULT del backend
+// Valor de respaldo hasta que cargarInicial() traiga el real desde
+// Configuración (parametros.mov_limite); evita una pantalla en blanco si el
+// usuario filtra movimientos antes de que esa llamada responda.
+var MOV_LIMITE_PANEL = 200;
 function cargarMovimientos() {
   var filtros = {
     desde: document.getElementById('f-desde').value,

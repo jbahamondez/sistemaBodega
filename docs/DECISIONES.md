@@ -602,3 +602,33 @@ cajas); si en realidad fueron 7 → diferencia −2 (retira 2 cajas más). Los
 y visible; el ajuste queda enlazado por texto en la observación
 ("Corrección de RET-000123: …"). Sin cambios de backend — reutiliza
 `apiAjusteConfirmar`, ya existente y con permiso de JEFATURA.
+
+## D-040 — Pantalla "Configuración": parámetros del sistema editables
+
+Pedido por el usuario: subir el umbral de "bajo mínimo" de 10 a 30 sin
+editar la planilla a mano, e ideas de qué más convendría poder ajustar.
+
+Se creó `src/Parametros.gs` (`parametrosObtener_`/`parametrosGuardar_`),
+respaldado en la hoja Configuracion (mismo mecanismo clave/valor que ya
+usan los contadores de ID) — no una hoja nueva. Se movieron ahí tres
+valores que antes eran constantes fijas en el código: `stock_minimo_default`
+(ya vivía en Configuracion, solo faltaba una forma de escribirlo),
+`backup_retencion_dias` (antes `BACKUP_RETENCION_DIAS = 14` en Backup.gs) y
+`mov_limite_default` (antes `MOV_LIMITE_DEFAULT = 200` en Movimientos.gs).
+`mov_limite` tiene un tope duro de 1000 (no editable) para no reabrir el
+hueco de A6 (listados sin límite real).
+
+Se descartó a propósito exponer parámetros de seguridad (intentos máximos
+de login, mínimo de dígitos del PIN): quedan fijos en el código para que
+nadie los debilite sin querer desde una pantalla.
+
+Nueva pestaña **"Configuración"** en el Panel (`web/panel.html`) — nombre
+elegido para no chocar con la pestaña ya existente "Ajustes" (corrección de
+cantidades de stock, un concepto distinto). El límite de movimientos del
+propio Panel (antes una constante `MOV_LIMITE_PANEL = 200` fija en el
+cliente) ahora se sincroniza con el valor real vía `apiConfigObtener` al
+cargar la página, para que el aviso de "mostrando los N más recientes" no
+quede desincronizado si alguien cambia el tope. Nuevos endpoints
+`apiConfigObtener`/`apiConfigGuardar` (JEFATURA). Pruebas nuevas:
+`testParametros_` (valores por defecto, guardado, validaciones y tope
+duro).

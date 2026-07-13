@@ -8,7 +8,7 @@
  * movimientos confirmados.
  */
 function panelDashboard_(inventarioYaLeido) {
-  var stockMinimo = utilToInt(dbGetConfigValue_('stock_minimo_default', '10')) || 0;
+  var stockMinimo = parametrosObtener_().stock_minimo;
   var inventario = inventarioYaLeido || invListar_();
 
   var stockTotal = 0;

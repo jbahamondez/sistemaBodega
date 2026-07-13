@@ -198,6 +198,17 @@ function apiCatalogoEliminarLote(token, productoIds) {
   return catalogoEliminarLoteProductos_(productoIds, u.usuario_id);
 }
 
+/** Parámetros del sistema (Configuración): stock mínimo, retención de respaldos, etc. */
+function apiConfigObtener(token) {
+  authValidar_(token, CONFIG.ROLES.JEFATURA);
+  return parametrosObtener_();
+}
+
+function apiConfigGuardar(token, datos) {
+  authValidar_(token, CONFIG.ROLES.JEFATURA);
+  return parametrosGuardar_(datos);
+}
+
 function apiCatalogoExportar(token) {
   authValidar_(token, CONFIG.ROLES.JEFATURA);
   return catalogoExportarCsv_();

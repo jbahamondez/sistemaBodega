@@ -306,21 +306,19 @@ function movResolverItem_(item, tipo, posicion, formatoPorCodigo, productoPorId)
   };
 }
 
-/** Tope por defecto de movimientos devueltos (auditoría A6). */
-var MOV_LIMITE_DEFAULT = 200;
-
 /**
  * Lista movimientos CONFIRMADOS, más recientes primero, con filtros
  * opcionales: { tipo, usuarioId, productoId, desde, hasta, limite } (fechas
  * 'yyyy-MM-dd'). Siempre acotado: sin `limite` explícito se devuelven como
- * máximo MOV_LIMITE_DEFAULT — el historial crece para siempre y una consulta
- * sin filtros no debe arrastrar todo (A6). El cliente detecta el truncado
+ * máximo el tope configurado (parametrosObtener_().mov_limite, editable
+ * desde Configuración) — el historial crece para siempre y una consulta sin
+ * filtros no debe arrastrar todo (A6). El cliente detecta el truncado
  * comparando length === limite y avisa "mostrando los N más recientes".
  */
 function movListar_(filtros) {
   filtros = filtros || {};
   var limite = utilToInt(filtros.limite);
-  if (limite === null || limite <= 0) limite = MOV_LIMITE_DEFAULT;
+  if (limite === null || limite <= 0) limite = parametrosObtener_().mov_limite;
 
   var conProducto = null;
   if (filtros.productoId) {

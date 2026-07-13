@@ -73,6 +73,9 @@ const projectGlobals = {
   // Ids.gs
   idNext_: 'readonly',
   idNextBatch_: 'readonly',
+  // Parametros.gs
+  parametrosObtener_: 'readonly',
+  parametrosGuardar_: 'readonly',
   // Historial.gs
   histRegistrar_: 'readonly',
   histRegistrarCambios_: 'readonly',
@@ -175,6 +178,8 @@ const projectGlobals = {
   apiCatalogoEliminarFormato: 'readonly',
   apiCatalogoEliminarProducto: 'readonly',
   apiCatalogoEliminarLote: 'readonly',
+  apiConfigObtener: 'readonly',
+  apiConfigGuardar: 'readonly',
   // Http.gs
   httpFunciones_: 'readonly',
   doPost: 'readonly',

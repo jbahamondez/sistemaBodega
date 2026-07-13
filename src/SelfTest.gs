@@ -173,7 +173,7 @@ function runMovimientoTests() {
     testPlanillaRealChocolateria_, testGestionUsuarios_, testEstadoLote_,
     testIdempotencia_, testFormulaInjection_,
     testAjusteReversa_, testMovLimite_, testPendientesAntiguos_,
-    testEliminarCatalogo_];
+    testEliminarCatalogo_, testParametros_];
   tests.forEach(function (t) {
     try {
       t();
@@ -940,6 +940,46 @@ function testEliminarCatalogo_() {
   assert_(rLote.eliminados === 1, 'lote elimina el que sí se puede');
   assert_(rLote.bloqueados.length === 1 && rLote.bloqueados[0].producto_id === usado.producto_id,
     'lote informa el bloqueado con su motivo');
+}
+
+/**
+ * Parámetros del sistema (Configuración): valores por defecto, guardado y
+ * validación. stock_minimo_default se reutiliza tal cual para no romper
+ * paneles ya guardados con ese valor bajo la clave antigua.
+ */
+function testParametros_() {
+  var iniciales = parametrosObtener_();
+  assert_(iniciales.stock_minimo === 10 && iniciales.backup_retencion_dias === 14 &&
+    iniciales.mov_limite === 200, 'valores por defecto cuando nunca se configuraron');
+
+  var guardados = parametrosGuardar_({ stock_minimo: 30, backup_retencion_dias: 7,
+    mov_limite: 500 });
+  assert_(guardados.stock_minimo === 30 && guardados.backup_retencion_dias === 7 &&
+    guardados.mov_limite === 500, 'guarda y devuelve los nuevos valores');
+  assert_(parametrosObtener_().stock_minimo === 30,
+    'los valores guardados persisten en llamadas posteriores');
+
+  // stock_minimo admite 0 (deshabilita la alerta de "bajo mínimo").
+  parametrosGuardar_({ stock_minimo: 0, backup_retencion_dias: 7, mov_limite: 500 });
+  assert_(parametrosObtener_().stock_minimo === 0, 'stock_minimo acepta 0');
+
+  var lanzoNegativo = false;
+  try { parametrosGuardar_({ stock_minimo: -1, backup_retencion_dias: 7, mov_limite: 500 }); }
+  catch (e) { lanzoNegativo = true; }
+  assert_(lanzoNegativo, 'rechaza stock_minimo negativo');
+
+  var lanzoRetencionCero = false;
+  try { parametrosGuardar_({ stock_minimo: 10, backup_retencion_dias: 0, mov_limite: 500 }); }
+  catch (e) { lanzoRetencionCero = true; }
+  assert_(lanzoRetencionCero, 'rechaza retención de respaldos en 0');
+
+  var lanzoLimiteExcesivo = false;
+  try { parametrosGuardar_({ stock_minimo: 10, backup_retencion_dias: 7, mov_limite: 5000 }); }
+  catch (e) { lanzoLimiteExcesivo = true; }
+  assert_(lanzoLimiteExcesivo, 'rechaza mov_limite por sobre el tope duro');
+
+  // Restaura valores por defecto para no afectar otras pruebas del runner.
+  parametrosGuardar_({ stock_minimo: 10, backup_retencion_dias: 14, mov_limite: 200 });
 }
 
 /** Integración: requiere setupDatabase() ejecutado. Se omite si no lo está. */
