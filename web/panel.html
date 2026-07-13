@@ -63,35 +63,34 @@
   .kpi span { font-size: .82rem; color: var(--gris); }
 
   /* --------------------------- métricas y gráficos ------------------------ */
-  .stat-tile { display: flex; align-items: baseline; flex-wrap: wrap; gap: .3rem 1rem;
-    margin-bottom: 1.2rem; padding: .8rem 1rem; background: #f9f9f7;
+  .stat-tile { display: flex; flex-direction: column; gap: .3rem;
+    padding: .8rem 1rem; background: #f9f9f7;
     border: 1px solid var(--borde); border-radius: 8px; }
-  .stat-tile .etiqueta { font-size: .8rem; color: var(--gris); display: block; }
+  .stat-tile .etiqueta { font-size: .8rem; color: var(--gris); }
+  .stat-tile .fila-valor { display: flex; align-items: baseline; flex-wrap: wrap; gap: .4rem .7rem; }
   .stat-tile .valor { font-size: 1.9rem; font-weight: 700; color: var(--marron); }
   .stat-tile .delta { font-size: .88rem; color: var(--marron-claro); }
-  .grafico-bloque { margin-bottom: 1.4rem; }
-  .grafico-bloque:last-child { margin-bottom: 0; }
-  .grafico-bloque h3 { font-size: .9rem; color: var(--marron-claro); margin: 0 0 .5rem;
-    font-weight: 600; }
-  /* Acordeón: el título es el botón que pliega/despliega (D-045). El estado
-     colapsado solo oculta el contenido — el título sigue siempre visible,
-     para no "perder" un gráfico de vista. */
+  /* Acordeón (D-045): el título es el botón que pliega/despliega. Estilo de
+     lista — una fila por gráfico, separadas por una línea fina — para que
+     se vea igual de ordenado plegado o desplegado, sin columnas dispares. */
+  .grafico-bloque { border-bottom: 1px solid var(--borde); padding: .7rem 0; }
+  .grafico-bloque:last-child { border-bottom: none; padding-bottom: 0; }
+  .grafico-bloque:first-child { padding-top: 0; }
   .grafico-titulo { cursor: pointer; user-select: none; display: flex;
-    align-items: center; gap: .3rem; }
-  .grafico-titulo:hover { color: var(--marron); }
-  .grafico-titulo .flecha { display: inline-block; font-size: .75rem;
-    transition: transform .15s; }
+    align-items: center; gap: .5rem; margin: 0; font-size: .92rem;
+    color: var(--marron); font-weight: 600; }
+  .grafico-titulo:hover { color: var(--marron-claro); }
+  .grafico-titulo .flecha { display: inline-block; width: 1rem; text-align: center;
+    font-size: .7rem; color: var(--gris); transition: transform .15s; }
   .grafico-bloque.colapsado .flecha { transform: rotate(-90deg); }
+  .grafico-bloque .grafico, .grafico-bloque .stat-tile { margin-top: .7rem; }
   .grafico-bloque.colapsado > .grafico,
   .grafico-bloque.colapsado > .stat-tile { display: none; }
-  .grafico-bloque.colapsado { margin-bottom: .5rem; }
   .grafico-svg { width: 100%; height: auto; display: block; cursor: crosshair; }
   .grafico-leyenda { display: flex; gap: 1rem; margin-bottom: .35rem; font-size: .8rem;
     color: var(--gris); }
   .grafico-leyenda .punto { display: inline-block; width: 9px; height: 9px;
     border-radius: 50%; margin-right: .3rem; }
-  .graficos-dos-col { display: grid; grid-template-columns: 1fr 1fr; gap: 0 1.4rem; }
-  @media (max-width: 720px) { .graficos-dos-col { grid-template-columns: 1fr; } }
   #grafico-tooltip { position: fixed; display: none; z-index: 200; background: #fff;
     border: 1px solid var(--borde); border-radius: 8px; padding: .5rem .7rem;
     font-size: .8rem; box-shadow: 0 4px 16px rgba(0,0,0,.18); pointer-events: none;
@@ -194,6 +193,11 @@
     <div class="kpis" id="kpis"><p class="muted">Cargando…</p></div>
 
     <div class="panel">
+      <h2>Alertas de stock</h2>
+      <div id="alertas"><p class="muted">Cargando…</p></div>
+    </div>
+
+    <div class="panel">
       <h2>Métricas y tendencias <span class="muted">(últimos 30 días)</span></h2>
       <div class="grafico-bloque" data-grafico-id="comparacion-semana">
         <h3 class="grafico-titulo" onclick="alternarGrafico(this)">
@@ -210,24 +214,18 @@
           <span class="flecha">▾</span> Evolución del stock total</h3>
         <div id="grafico-evolucion-stock" class="grafico"><p class="muted">Cargando…</p></div>
       </div>
-      <div class="graficos-dos-col">
-        <div class="grafico-bloque" data-grafico-id="top-rotacion">
-          <h3 class="grafico-titulo" onclick="alternarGrafico(this)">
-            <span class="flecha">▾</span> Top 10 productos con más rotación</h3>
-          <div id="grafico-top-rotacion" class="grafico"><p class="muted">Cargando…</p></div>
-        </div>
-        <div class="grafico-bloque" data-grafico-id="actividad-usuario">
-          <h3 class="grafico-titulo" onclick="alternarGrafico(this)">
-            <span class="flecha">▾</span> Actividad por usuario</h3>
-          <div id="grafico-actividad-usuario" class="grafico"><p class="muted">Cargando…</p></div>
-        </div>
+      <div class="grafico-bloque" data-grafico-id="top-rotacion">
+        <h3 class="grafico-titulo" onclick="alternarGrafico(this)">
+          <span class="flecha">▾</span> Top 10 productos con más rotación</h3>
+        <div id="grafico-top-rotacion" class="grafico"><p class="muted">Cargando…</p></div>
+      </div>
+      <div class="grafico-bloque" data-grafico-id="actividad-usuario">
+        <h3 class="grafico-titulo" onclick="alternarGrafico(this)">
+          <span class="flecha">▾</span> Actividad por usuario</h3>
+        <div id="grafico-actividad-usuario" class="grafico"><p class="muted">Cargando…</p></div>
       </div>
     </div>
 
-    <div class="panel">
-      <h2>Alertas de stock</h2>
-      <div id="alertas"><p class="muted">Cargando…</p></div>
-    </div>
     <div class="panel">
       <h2>Últimos movimientos</h2>
       <div id="ultimos"><p class="muted">Cargando…</p></div>
@@ -707,11 +705,13 @@ function renderComparacionSemana(c) {
   var cambio = c.cambio_porcentual;
   var flecha = cambio > 0 ? '▲' : cambio < 0 ? '▼' : '—';
   document.getElementById('stat-comparacion-semana').innerHTML =
-    '<div><span class="etiqueta">Retiros esta semana</span>' +
-    '<span class="valor">' + fmtNum(c.retiros_semana_actual) + '</span> ' +
-    '<span class="muted">unidades</span></div>' +
-    '<div class="delta">' + flecha + ' ' + Math.abs(cambio) + '% vs. semana anterior (' +
-    fmtNum(c.retiros_semana_anterior) + ' unid.)</div>';
+    '<span class="etiqueta">Retiros esta semana</span>' +
+    '<div class="fila-valor">' +
+    '<span class="valor">' + fmtNum(c.retiros_semana_actual) + '</span>' +
+    '<span class="muted">unidades</span>' +
+    '<span class="delta">' + flecha + ' ' + Math.abs(cambio) + '% vs. semana anterior (' +
+    fmtNum(c.retiros_semana_anterior) + ' unid.)</span>' +
+    '</div>';
 }
 
 function renderMetricas(m) {

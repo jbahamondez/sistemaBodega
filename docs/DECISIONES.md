@@ -759,3 +759,16 @@ rota) siempre queda visible aunque esté plegado, para no "perder" el
 gráfico de vista — solo se oculta el contenido (`.grafico-bloque.colapsado
 > .grafico` / `> .stat-tile`). Cubre las 5 vistas de D-044, incluida la
 tarjeta de comparación semanal (que ahora también lleva su propio título).
+
+Ajuste el mismo día (feedback directo, capturas de pantalla): dos problemas
+de orden visual. (1) La tarjeta de comparación semanal usaba `.stat-tile`
+como contenedor `flex` con dos `<div>` hijos — al ser ambos ítems flex con
+`align-items:baseline`, el texto del delta terminaba alineado junto a la
+etiqueta en vez de bajo el número grande. Se cambió a `flex-direction:
+column` (etiqueta arriba, una fila interna con valor+delta abajo). (2) "Top
+10 rotación" y "Actividad por usuario" vivían en una grilla de 2 columnas
+(`.graficos-dos-col`) mientras el resto era una sola columna — al plegar
+todo, el orden se veía asimétrico. Se unificó todo en una sola columna con
+estilo de lista (borde inferior fino entre filas), y se movió el panel
+"Alertas de stock" ANTES de "Métricas y tendencias" en el Dashboard (pedido
+explícito: alertas primero, gráficos después).
