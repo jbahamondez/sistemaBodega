@@ -51,6 +51,8 @@
      vez de aplastarse en pantallas chicas. */
   .panel table { min-width: 640px; }
 
+  .refresco-bar { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap;
+    margin-bottom: .8rem; }
   .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
     gap: .8rem; margin-bottom: 1rem; }
   .kpi { background: #fff; border: 1px solid var(--borde); border-radius: 8px;
@@ -137,6 +139,12 @@
 
   <!-- ============================ DASHBOARD ============================ -->
   <section id="tab-dashboard" class="tab activa">
+    <div class="refresco-bar">
+      <span class="muted" id="ultima-actualizacion">Cargando…</span>
+      <button class="accion" onclick="cargarInicial()">🔄 Actualizar todo</button>
+      <button class="accion" id="btn-auto-refresco" onclick="alternarAutoRefresco()">
+        ⏸ Pausar auto-actualización</button>
+    </div>
     <div class="kpis" id="kpis"><p class="muted">Cargando…</p></div>
     <div class="panel">
       <h2>Alertas de stock</h2>
@@ -366,13 +374,17 @@ function tablaMovimientos(movs) {
 }
 
 // ------------------------------- dashboard ---------------------------------
-// Carga inicial combinada (una sola llamada al backend).
+// Carga inicial combinada (una sola llamada al backend). También la usan el
+// botón "Actualizar todo", el auto-refresco y el refresco al volver a la
+// pestaña — todos son, en el fondo, "recargar lo mismo que al abrir el Panel".
 function cargarInicial() {
   llamar('apiPanelInicial', [], function (r) {
     renderDashboard(r.dashboard);
     inventarioCache = r.inventario || [];
     renderInventario();
     poblarSelectsProducto();
+    ultimaActualizacion = new Date();
+    renderUltimaActualizacion();
   });
   // Trae el tope real de movimientos configurado (por defecto MOV_LIMITE_PANEL
   // hasta que responda), para que el aviso de "mostrando los N más recientes"
@@ -382,6 +394,40 @@ function cargarInicial() {
     MOV_LIMITE_PANEL = p.mov_limite;
   });
 }
+
+// --------------------------- auto-actualización -----------------------------
+// Apps Script no soporta tiempo real (WebSockets/streaming): esto es polling
+// cada 30s + un refresco extra al volver a la pestaña, que "se siente en
+// vivo" sin acercarse a ninguna cuota (unos pocos miles de llamadas/día).
+var AUTO_REFRESCO_MS = 30000;
+var ultimaActualizacion = null;
+var autoRefrescoActivo = true;
+var timerAutoRefresco = null;
+
+function renderUltimaActualizacion() {
+  var el = document.getElementById('ultima-actualizacion');
+  if (!el || !ultimaActualizacion) return;
+  var segundos = Math.round((Date.now() - ultimaActualizacion.getTime()) / 1000);
+  el.textContent = segundos < 5 ? 'Actualizado recién'
+    : segundos < 60 ? 'Actualizado hace ' + segundos + ' s'
+    : 'Actualizado hace ' + Math.round(segundos / 60) + ' min';
+}
+function iniciarAutoRefresco() {
+  if (timerAutoRefresco) clearInterval(timerAutoRefresco);
+  timerAutoRefresco = autoRefrescoActivo ? setInterval(cargarInicial, AUTO_REFRESCO_MS) : null;
+}
+function alternarAutoRefresco() {
+  autoRefrescoActivo = !autoRefrescoActivo;
+  iniciarAutoRefresco();
+  document.getElementById('btn-auto-refresco').textContent =
+    autoRefrescoActivo ? '⏸ Pausar auto-actualización' : '▶ Reanudar auto-actualización';
+}
+// Si la pestaña estaba minimizada o en segundo plano y el usuario vuelve a
+// ella, refresca de inmediato en vez de esperar el próximo tick.
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'visible' && autoRefrescoActivo) cargarInicial();
+});
+setInterval(renderUltimaActualizacion, 1000); // solo el texto "hace X", no pide datos
 
 // ----------------------------- configuración -------------------------------
 var parametros = { stock_minimo: 10, backup_retencion_dias: 14, mov_limite: 200 };
@@ -883,6 +929,7 @@ function cargarTrazabilidad() {
 // El panel es exclusivo de jefatura (§12.4); el servidor revalida cada llamada.
 Sesion.asegurarRolConfirmado('JEFATURA', function () {
   cargarInicial();
+  iniciarAutoRefresco();
 });
 </script>
 </body>

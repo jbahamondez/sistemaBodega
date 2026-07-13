@@ -666,3 +666,24 @@ previa, un snackbar inferior centrado (estilo Material Design).
 `#sesion-chip`, sin importar el ancho de pantalla. Sin cambios de
 comportamiento (mismo `Ui.toast(mensaje, tipo)`, misma animación), solo
 posición.
+
+## D-043 — Panel: auto-actualización del Dashboard (sin tiempo real verdadero)
+
+Pedido por el usuario: ver los últimos movimientos y alertas de stock
+"en vivo". Apps Script no soporta conexiones persistentes (WebSockets/SSE),
+así que tiempo real verdadero no es viable sin cambiar de backend — se
+implementó en su lugar polling cada 30s (`AUTO_REFRESCO_MS`) más un
+refresco inmediato al volver a la pestaña (`visibilitychange`), que cubre
+el caso más común ("la dejé minimizada, vuelvo a mirar") sin esperar el
+siguiente tick. Costo irrelevante: unos pocos miles de llamadas por jornada
+completa, muy por debajo de cualquier cuota de Apps Script.
+
+`web/panel.html`: barra nueva sobre el Dashboard con "Actualizado hace N s/min"
+(se recalcula cada segundo localmente, sin pedir datos — `renderUltimaActualizacion`),
+botón **"🔄 Actualizar todo"** (llama `cargarInicial()` directo, el mismo
+código que ya usaban el auto-refresco y varias acciones existentes) y
+**"⏸ Pausar auto-actualización"** (detiene el temporizador Y el refresco por
+visibilidad; un segundo clic los reanuda). `cargarInicial()` ahora también
+registra el momento de la última carga, así que CUALQUIER acción que ya la
+invocaba (guardar Configuración, confirmar un ajuste, etc.) también
+actualiza el indicador, sin duplicar lógica.
