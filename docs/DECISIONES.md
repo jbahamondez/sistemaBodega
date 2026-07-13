@@ -577,3 +577,28 @@ alfabéticamente por nombre, con las mismas columnas que el resto de tablas
 del panel (Producto, Categoría, Código, Stock si aplica, Última
 actualización) — reutiliza los estilos de tabla ya existentes, sin CSS
 nuevo.
+
+## D-039 — Corregir cantidades de un RETIRO (sin editar el historial)
+
+Pedido por el usuario: que Jefatura pueda corregir un retiro cuando el
+Trabajador se equivocó en la cantidad. El sistema nunca edita un movimiento
+confirmado (D-005/D-016 — la trazabilidad no se sobreescribe), así que se
+evaluaron dos caminos: usar solo "Revertir movimiento" (ya existente, deshace
+todo el retiro) + registrar uno nuevo con la cantidad correcta; o un
+corrector guiado que pida la cantidad correcta por ítem y aplique solo la
+diferencia. El usuario eligió el corrector guiado.
+
+`corregirRetiro()` (`web/panel.html`), botón nuevo en el detalle de
+movimiento visible solo para `tipo === 'RETIRO'`: muestra cada ítem con su
+cantidad original (`cantidad_empaques`, siempre positiva en un RETIRO — el
+signo negativo vive en `total_unidades`) y un campo editable con la cantidad
+real. Al aplicar, por cada ítem calcula `diferencia = original - corregido`
+y arma un único `AJUSTE` con esos deltas (mismo mecanismo que ya usa
+Revertir vía `apiAjusteConfirmar`, sin endpoint nuevo). Ejemplo: se
+registraron 5 cajas pero en realidad fueron 3 → diferencia +2 (repone 2
+cajas); si en realidad fueron 7 → diferencia −2 (retira 2 cajas más). Los
+ítems sin diferencia se omiten (evita el error "cantidad inválida" que
+`movResolverItem_` lanza ante cantidad 0). El retiro original queda intacto
+y visible; el ajuste queda enlazado por texto en la observación
+("Corrección de RET-000123: …"). Sin cambios de backend — reutiliza
+`apiAjusteConfirmar`, ya existente y con permiso de JEFATURA.

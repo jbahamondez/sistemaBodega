@@ -274,6 +274,8 @@
     <h2 id="det-titulo" style="color:var(--marron);margin-top:0"></h2>
     <div id="det-contenido"></div>
     <p>
+      <button class="accion" id="det-corregir" style="display:none"
+        onclick="corregirRetiro()">✏️ Corregir cantidades</button>
       <button class="accion" id="det-revertir" style="display:none;color:var(--err)"
         onclick="revertirMovimiento()">↩️ Revertir movimiento</button>
       <button class="accion" onclick="cerrarDetalle()">Cerrar</button>
@@ -531,6 +533,60 @@ function revertirMovimiento() {
     }, { icono: '↩️', textoAceptar: 'Revertir' });
 }
 
+/**
+ * Corrección guiada de cantidades de un RETIRO (a diferencia de Revertir,
+ * que deshace el movimiento completo): Jefatura ingresa la cantidad
+ * CORRECTA por ítem y el sistema calcula la diferencia con lo registrado,
+ * aplicándola como un único AJUSTE enlazado al retiro original — que nunca
+ * se modifica ni se borra (la trazabilidad conserva ambos movimientos).
+ */
+function corregirRetiro() {
+  if (!detalleActual) return;
+  var m = detalleActual.cabecera;
+  var detalles = detalleActual.detalles;
+  var campos = detalles.map(function (d, i) {
+    return { id: 'cant_' + i, tipo: 'number', valor: d.cantidad_empaques,
+      label: d.producto_nombre_snapshot + ' — ' + d.formato_nombre_snapshot,
+      ayuda: 'Se registró como ' + d.cantidad_empaques + ' empaque(s). Ingresa la ' +
+        'cantidad que realmente se retiró.' };
+  });
+  campos.push({ id: 'motivo', label: 'Motivo de la corrección (obligatorio)',
+    ayuda: 'Se creará un AJUSTE con la diferencia, enlazado a ' + m.movimiento_id +
+      '. El retiro original no se modifica.' });
+
+  Ui.formulario('Corregir cantidades — ' + m.movimiento_id, campos, function (v) {
+    if (!(v.motivo || '').trim()) return 'El motivo es obligatorio.';
+    var items = [];
+    var error = null;
+    detalles.forEach(function (d, i) {
+      var corregido = parseInt(v['cant_' + i], 10);
+      if (isNaN(corregido) || corregido < 0) {
+        error = 'La cantidad de "' + d.producto_nombre_snapshot + '" debe ser un número ' +
+          'entero mayor o igual a 0.';
+        return;
+      }
+      var original = parseInt(d.cantidad_empaques, 10) || 0;
+      var diferencia = original - corregido; // AJUSTE suma con el signo (D-030/A4).
+      if (diferencia !== 0) {
+        items.push({ codigo_barras: d.codigo_barras_snapshot, cantidad_empaques: diferencia });
+      }
+    });
+    if (error) return error;
+    if (items.length === 0) return 'No hay ninguna diferencia con las cantidades registradas.';
+
+    llamar('apiAjusteConfirmar', [{
+      tipo: 'AJUSTE',
+      observacion: 'Corrección de ' + m.movimiento_id + ': ' + v.motivo,
+      claveIdempotencia: uuid(),
+      items: items
+    }], function (r) {
+      cerrarDetalle();
+      Ui.toast('Corrección registrada: ' + r.movimiento_id + '.', 'ok');
+      cargarInicial();
+    }, mostrarErrorUi);
+  }, { icono: '✏️', textoAceptar: 'Aplicar corrección' });
+}
+
 // ------------------------------ movimientos --------------------------------
 var MOV_LIMITE_PANEL = 200; // debe coincidir con MOV_LIMITE_DEFAULT del backend
 function cargarMovimientos() {
@@ -581,6 +637,9 @@ function abrirDetalle(movimientoId) {
     // reversa (evita reversas de reversas encadenadas).
     var botonRevertir = document.getElementById('det-revertir');
     botonRevertir.style.display = m.tipo === 'REVERSA' ? 'none' : '';
+    // Corregir cantidades: solo tiene sentido para RETIROS (pedido del
+    // usuario — un Trabajador se equivocó en la cantidad retirada).
+    document.getElementById('det-corregir').style.display = m.tipo === 'RETIRO' ? '' : 'none';
     document.getElementById('det-contenido').innerHTML = html + '</table>';
     document.getElementById('detalle-mov').style.display = 'flex';
   });
