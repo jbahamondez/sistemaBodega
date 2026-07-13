@@ -451,3 +451,22 @@ servidor decide todo lo que depende de la sesión en el inicio (saludo +
 qué tarjetas mostrar) y llama `onListo(datosConfirmados)` una sola vez, con
 el rol siempre recién confirmado. `confirmarRolPara` (el método anterior)
 queda eliminado por no tener más usos.
+
+## D-033 — Causa raíz real de las tarjetas de Jefatura visibles: especificidad CSS
+
+D-031 y D-032 corrigieron riesgos reales (destello por timing, doble llamada
+redundante) pero NO eran la causa del síntoma reportado en el inicio. Se
+confirmó con evidencia directa (DevTools → Elements, con la cuenta de prueba
+TRABAJADOR): `apiSesionInfo` devolvía `rol: "TRABAJADOR"` correctamente y el
+script nunca agregaba `style="display:block"` a las tarjetas — es decir, el
+JavaScript funcionaba bien. La regla `.solo-jefatura { display: none; }`
+aparecía tachada (ignorada) en el panel de estilos: `a.tarjeta { display:
+block; ... }` tiene mayor especificidad CSS (selector etiqueta+clase) que
+`.solo-jefatura` (una sola clase), así que ganaba siempre sin importar el
+orden en la hoja de estilos.
+
+Fix en `web/index.html`: `a.tarjeta.solo-jefatura { display: none; }`
+(etiqueta + dos clases), con especificidad mayor que `a.tarjeta`. Lección:
+ante un síntoma de "el JS parece correcto pero el efecto visual no ocurre",
+verificar primero si una regla CSS está siendo sobrescrita antes de asumir
+un bug de lógica o de timing.
