@@ -6,7 +6,7 @@
   "scripts": {
     "lint": "eslint src web",
     "test": "node scripts/run-tests.js",
-    "check": "eslint src web && node scripts/syntax-check.js && node scripts/run-tests.js"
+    "check": "eslint src web && node scripts/syntax-check.js && node scripts/check-whitelist.js && node scripts/run-tests.js"
   },
   "devDependencies": {
     "eslint": "^9.0.0"

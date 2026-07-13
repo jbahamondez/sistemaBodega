@@ -632,3 +632,22 @@ quede desincronizado si alguien cambia el tope. Nuevos endpoints
 `apiConfigObtener`/`apiConfigGuardar` (JEFATURA). Pruebas nuevas:
 `testParametros_` (valores por defecto, guardado, validaciones y tope
 duro).
+
+## D-041 — Bug real: funciones nuevas de Api.gs no registradas en la whitelist HTTP
+
+Reportado por el usuario al probar Configuración: "Error: Función
+desconocida: 'apiConfigObtener'". Causa: `Http.gs` mantiene una lista blanca
+explícita (`httpFunciones_()`) de qué funciones de `Api.gs` son invocables
+desde el cliente (D-020); agregar una función nueva a `Api.gs` sin sumarla
+también ahí la deja inalcanzable, y nada lo detectaba automáticamente.
+Revisando, el mismo olvido ya había pasado con `apiCatalogoEliminarProducto`/
+`apiCatalogoEliminarFormato`/`apiCatalogoEliminarLote` (D-037) — es probable
+que el "no se pudo eliminar" que el usuario vio en esa prueba fuera este
+mismo error, no el bloqueo por stock/movimientos que se asumió en su
+momento sin confirmar el texto exacto del aviso.
+
+Fix inmediato: las 5 funciones faltantes agregadas a `httpFunciones_()`.
+Fix estructural: `scripts/check-whitelist.js` (nuevo, corre en
+`npm run check`) escanea `Api.gs` en busca de toda función `apiXxx` y falla
+si alguna no aparece en la whitelist de `Http.gs` — para que este bug ya no
+pueda pasar desapercibido.
