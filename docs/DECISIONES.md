@@ -818,3 +818,18 @@ dispositivo tiene una interfaz de red activa, no que haya internet real
 (puede estar "conectado" a un WiFi sin salida, típico de bodegas), así que
 una llamada que falla por red también enciende el aviso aunque el
 navegador diga que está online.
+
+Bug real encontrado al probar (mensaje visto: "Failed to fetch" crudo del
+navegador, sin la palabra "conexión"): `llamarServidor` en `comun.js`
+decía "si el error del navegador tiene mensaje, muéstralo tal cual" —
+y un `fetch()` rechazado por falta de red SIEMPRE trae mensaje propio
+(`"Failed to fetch"` en Chrome, `"NetworkError when attempting to fetch
+resource"` en Firefox, `"Load failed"` en Safari), así que el texto
+amigable "Sin conexión con el servidor" nunca se usaba en la práctica. Esto
+rompía la detección de `retiro.html` (D-047), que busca la palabra
+"conexión" para decidir si ofrecer el catálogo offline. Fix: el bloque
+`catch()` de `llamarServidor` ahora SIEMPRE arma su propio mensaje
+reconocible ("Sin conexión con el servidor…" / "El servidor tardó
+demasiado…"), descartando el texto crudo del navegador — todo lo que cae
+ahí es, por diseño, un problema de red (los errores de negocio ya se
+resuelven antes, en el `.then()`).

@@ -117,13 +117,23 @@ window.uuid = function () {
       clearTimeout(temporizador);
       if (res.ok) onOk(res.data);
       else onErr(new Error(res.error || 'Error desconocido.'));
-    }).catch(function (err) {
+    }).catch(function () {
+      // Todo lo que cae aquí es un problema de red/comunicación (fetch()
+      // rechazado por no haber conexión, CORS, JSON inválido, o el "Error de
+      // conexión (HTTP …)" de arriba) — nunca un error de negocio, esos ya
+      // se resolvieron en el .then() anterior. Se descarta a propósito el
+      // mensaje crudo del navegador (p. ej. "Failed to fetch", "NetworkError
+      // when attempting to fetch resource" en Firefox, "Load failed" en
+      // Safari — cada uno distinto y ninguno útil para el usuario) por un
+      // texto siempre reconocible como "problema de conexión", que además
+      // usan otras pantallas (retiro.html, D-047) para decidir si ofrecer
+      // una alternativa sin conexión.
       clearTimeout(temporizador);
       if (expiro) {
         onErr(new Error('El servidor tardó demasiado en responder. Revisa tu ' +
           'conexión e intenta de nuevo.'));
       } else {
-        onErr(err.message ? err : new Error('Sin conexión con el servidor.'));
+        onErr(new Error('Sin conexión con el servidor. Revisa tu conexión e intenta de nuevo.'));
       }
     });
   }
