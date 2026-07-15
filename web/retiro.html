@@ -471,8 +471,13 @@ function procesarCodigo(codigo) {
       agregarAlCarro(infoOffline, true);
       return;
     }
-    banner('✖ Sin conexión y el código no está guardado localmente. ' +
-      'Intenta de nuevo cuando haya señal.', 'err');
+    // Mensaje deliberadamente detallado (diagnóstico D-047): sin esto es
+    // imposible saber, solo mirando la pantalla del celular, si el código
+    // realmente no está en el catálogo guardado o si el catálogo nunca se
+    // llegó a guardar.
+    banner('✖ Sin conexión. Código "' + codigo + '" no está en el catálogo local (' +
+      Object.keys(catalogoOffline).length + ' códigos guardados). Intenta de nuevo ' +
+      'cuando haya señal.', 'err');
     vibrar([200]);
     reanudarEscaneo(2500);
   });
