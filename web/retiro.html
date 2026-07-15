@@ -444,13 +444,17 @@ function procesarCodigo(codigo) {
     cacheCodigos[codigo] = r;
     agregarAlCarro(r);
   }, function (err) {
-    // Solo se usa el catálogo offline ante un problema de RED real (timeout,
-    // "sin conexión", etc. — mensajes que arma llamarServidor en comun.js).
-    // Un error de negocio genuino (p. ej. "Usuario inactivo") no es un
-    // problema de conexión y debe mostrarse tal cual, sin ocultarlo detrás
-    // del catálogo local.
+    // Solo se usa el catálogo offline ante un problema de RED real. No basta
+    // con reconocer los mensajes en español de llamarServidor (comun.js) —
+    // si ese archivo quedó en una versión distinta cacheada en el celular,
+    // o el navegador entrega su propio texto (Failed to fetch en Chrome,
+    // NetworkError… en Firefox, Load failed en Safari), esta lista amplia
+    // igual lo reconoce como problema de red. Un error de negocio genuino
+    // (p. ej. "Usuario inactivo") no calza con nada de esto y se muestra
+    // tal cual, sin ocultarlo detrás del catálogo local.
     var msg = (err && err.message) || '';
-    var esProblemaDeRed = msg.indexOf('conexión') !== -1 || msg.indexOf('tardó demasiado') !== -1;
+    var esProblemaDeRed = /conexi[oó]n|tard[oó] demasiado|failed to fetch|networkerror|load failed|network request failed/i
+      .test(msg);
     if (!esProblemaDeRed) {
       banner('✖ ' + msg, 'err');
       vibrar([200]);
