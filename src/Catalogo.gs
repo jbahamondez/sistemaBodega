@@ -450,6 +450,36 @@ function catalogoBuscarPorCodigoBarras_(codigoBarras) {
   return { producto: producto, formato: formato };
 }
 
+/**
+ * Catálogo liviano (solo identidad: código → producto/formato, SIN stock)
+ * para que el cliente lo guarde localmente y reconozca un código escaneado
+ * sin depender de la red en ese instante (D-047, mitigación de "sin señal"
+ * en Retiro). El stock NUNCA se cachea aquí a propósito: sigue
+ * validándose siempre en el servidor al confirmar (movConfirmar_ relee todo
+ * bajo lock), así que esto es una comodidad de identificación, no un hueco
+ * de seguridad ni de integridad de datos.
+ */
+function catalogoListarOffline_() {
+  var productosActivos = {};
+  dbReadAll_('PRODUCTOS').forEach(function (p) {
+    if (utilToBool(p.activo)) productosActivos[p.producto_id] = p;
+  });
+  return dbReadAll_('FORMATOS_EMPAQUE')
+    .filter(function (f) { return utilToBool(f.activo) && productosActivos[f.producto_id]; })
+    .map(function (f) {
+      var p = productosActivos[f.producto_id];
+      return {
+        codigo_barras: f.codigo_barras,
+        producto_id: p.producto_id,
+        producto_nombre: p.nombre,
+        formato_id: f.formato_id,
+        formato_nombre: f.nombre_formato,
+        tipo_empaque: f.tipo_empaque,
+        unidades_por_empaque: utilToInt(f.unidades_por_empaque)
+      };
+    });
+}
+
 /** Exporta el catálogo completo como CSV (§8.13), reimportable tras editar. */
 function catalogoExportarCsv_() {
   var productos = {};

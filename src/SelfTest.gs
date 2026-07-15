@@ -173,7 +173,7 @@ function runMovimientoTests() {
     testPlanillaRealChocolateria_, testGestionUsuarios_, testEstadoLote_,
     testIdempotencia_, testFormulaInjection_,
     testAjusteReversa_, testMovLimite_, testPendientesAntiguos_,
-    testEliminarCatalogo_, testParametros_, testPanelMetricas_];
+    testEliminarCatalogo_, testParametros_, testPanelMetricas_, testCatalogoOffline_];
   tests.forEach(function (t) {
     try {
       t();
@@ -940,6 +940,29 @@ function testEliminarCatalogo_() {
   assert_(rLote.eliminados === 1, 'lote elimina el que sí se puede');
   assert_(rLote.bloqueados.length === 1 && rLote.bloqueados[0].producto_id === usado.producto_id,
     'lote informa el bloqueado con su motivo');
+}
+
+/**
+ * Catálogo offline (D-047): solo identidad (código → producto/formato),
+ * NUNCA stock — y solo incluye productos/formatos ACTIVOS.
+ */
+function testCatalogoOffline_() {
+  var producto = catalogoCrearProducto_({ nombre: 'OFF Producto', codigo_producto: 'OFF-1' });
+  var formato = catalogoCrearFormato_({ producto_id: producto.producto_id,
+    codigo_barras: 'OFF-CB-1', nombre_formato: 'Caja', tipo_empaque: 'CAJA',
+    unidades_por_empaque: 8 });
+
+  var lista = catalogoListarOffline_();
+  var fila = lista.filter(function (f) { return f.codigo_barras === 'OFF-CB-1'; })[0];
+  assert_(!!fila, 'el formato activo aparece en el catálogo offline');
+  assert_(fila.producto_nombre === 'OFF Producto' && fila.formato_nombre === 'Caja' &&
+    fila.unidades_por_empaque === 8, 'trae los datos de identidad correctos');
+  assert_(fila.stock_unidades === undefined, 'NUNCA incluye stock (se valida siempre en el servidor)');
+
+  catalogoCambiarEstado_('FORMATO', formato.formato_id, false, true);
+  var listaTrasDesactivar = catalogoListarOffline_();
+  assert_(!listaTrasDesactivar.some(function (f) { return f.codigo_barras === 'OFF-CB-1'; }),
+    'un formato desactivado ya no aparece en el catálogo offline');
 }
 
 /**

@@ -783,3 +783,38 @@ ser una acción normal y frecuente (terminar de escanear para ir a revisar
 el carro). Cambiado a **"Terminar de escanear"** con estilo `principal`
 (relleno, color marca) en vez de `peligro` — visualmente ahora es la
 acción principal para avanzar, no una alerta.
+
+## D-047 — Mitigar falta de señal al escanear un retiro
+
+Pedido por el usuario: una bodega (paredes de concreto, estanterías
+metálicas) es justo el lugar donde la señal falla, y hoy un escaneo sin
+conexión simplemente fracasa sin alternativa. Se plantearon cuatro ideas;
+el usuario eligió dos: precargar el catálogo completo y un aviso visible de
+"sin conexión" (dejó fuera, por ahora, el reintento automático al
+confirmar — ya existe un mensaje claro + reintento manual seguro gracias a
+la clave de idempotencia, C2).
+
+**Catálogo offline** (`apiCatalogoOffline` → `catalogoListarOffline_` en
+Catalogo.gs): SOLO identidad (código de barras → producto/formato/
+unidades), **nunca stock** — el stock sigue validándose siempre en el
+servidor al confirmar (`movConfirmar_` relee todo bajo lock), así que esto
+es una comodidad de identificación, no un hueco de integridad. Solo incluye
+productos/formatos activos. En `retiro.html`, se guarda en `localStorage` y
+se refresca sola cada vez que hay conexión (`cargarCatalogoOffline`, al
+abrir la página y al recuperar la señal).
+
+Cuando `apiBuscarCodigo` falla, `procesarCodigo` distingue un problema de
+RED real (mensajes "conexión"/"tardó demasiado" que arma `llamarServidor`
+en comun.js) de un error de negocio genuino (p. ej. "Usuario inactivo") —
+solo ante un problema de red se usa el catálogo local; un error real se
+muestra tal cual, sin ocultarlo. Un ítem agregado así queda marcado
+(`sinVerificar`, con un ícono 📡 en el carro) hasta que se confirme el
+retiro, donde el servidor valida todo de verdad.
+
+**Aviso de conexión**: banner naranja bajo el header ("📡 Sin conexión…"),
+controlado tanto por los eventos `online`/`offline` del navegador como por
+llamadas reales fallidas — `navigator.onLine` solo indica que el
+dispositivo tiene una interfaz de red activa, no que haya internet real
+(puede estar "conectado" a un WiFi sin salida, típico de bodegas), así que
+una llamada que falla por red también enciende el aviso aunque el
+navegador diga que está online.

@@ -7,7 +7,7 @@
 <style>
   :root {
     --marron: #4e342e; --crema: #faf6f1; --ok: #2e7d32; --err: #c62828;
-    --borde: #e0d7ce; --gris: #757575;
+    --borde: #e0d7ce; --gris: #757575; --warn: #ef6c00;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   body { font-family: system-ui, sans-serif; margin: 0; background: var(--crema);
@@ -26,6 +26,11 @@
   header button[onclick*="cerrar"] { border: 1px solid rgba(255,217,179,.55);
     border-radius: 8px; padding: .3rem .6rem; }
   main { max-width: 560px; margin: 0 auto; padding: 1rem; }
+  /* Aviso de conexión (D-047): banner persistente mientras no hay señal,
+     sticky bajo el header para que se vea sin importar la vista activa. */
+  #banner-conexion { display: none; position: sticky; top: 3.1rem; z-index: 4;
+    background: #fff3e0; color: var(--warn); border-bottom: 1px solid var(--warn);
+    padding: .55rem 1rem; font-size: .85rem; text-align: center; font-weight: 600; }
 
   .vista { display: none; }
   .vista.activa { display: block; }
@@ -106,6 +111,8 @@
   <a href="index.html" style="color:#ffd9b3;text-decoration:none;font-size:.85rem">⌂ Inicio</a>
   <button onclick="Sesion.cerrar()" style="font-size:.85rem">Salir</button>
 </header>
+<div id="banner-conexion">📡 Sin conexión — puedes seguir escaneando; se guarda localmente
+  y se verifica al confirmar el retiro.</div>
 
 <main>
   <div id="mensaje"></div>
@@ -181,6 +188,41 @@ var carro = [];
 // Se genera al agregar el primer producto y se limpia al confirmar/cancelar.
 var claveOperacion = null;
 var cacheCodigos = {};
+
+// --------------------- catálogo offline (D-047) -----------------------------
+// Copia local de "código → producto/formato" (SIN stock — eso se valida
+// siempre en el servidor al confirmar) para reconocer un escaneo aunque no
+// haya señal en ese instante. Se refresca sola cada vez que hay conexión;
+// si nunca se pudo cargar (primera vez sin señal), simplemente no hay nada
+// que ofrecer offline todavía.
+var CLAVE_CATALOGO_OFFLINE = 'retiro_catalogo_offline_v1';
+var catalogoOffline = {};
+function cargarCatalogoOffline() {
+  try {
+    var guardado = JSON.parse(localStorage.getItem(CLAVE_CATALOGO_OFFLINE) || '{}');
+    catalogoOffline = guardado || {};
+  } catch (e) { catalogoOffline = {}; }
+  // Best-effort: si no hay conexión esto simplemente falla en silencio y se
+  // sigue usando la copia local que ya había (o vacía, la primera vez).
+  Sesion.api('apiCatalogoOffline', [], function (lista) {
+    var mapa = {};
+    (lista || []).forEach(function (f) { mapa[f.codigo_barras] = f; });
+    catalogoOffline = mapa;
+    try { localStorage.setItem(CLAVE_CATALOGO_OFFLINE, JSON.stringify(mapa)); }
+    catch (e) { /* sin almacenamiento: sigue funcionando solo en memoria */ }
+  }, function () { /* sin conexión: se sigue usando la copia que ya había */ });
+}
+
+// ------------------------- aviso de conexión (D-047) ------------------------
+// navigator.onLine solo detecta que el dispositivo tiene una interfaz de red
+// activa (puede estar "conectado" a un WiFi sin internet real, típico en
+// bodegas con señal débil) — por eso también se marca "sin conexión" cuando
+// una llamada real al servidor falla por red, no solo por el evento offline.
+function actualizarBannerConexion(sinConexion) {
+  document.getElementById('banner-conexion').style.display = sinConexion ? 'block' : 'none';
+}
+window.addEventListener('online', function () { actualizarBannerConexion(false); cargarCatalogoOffline(); });
+window.addEventListener('offline', function () { actualizarBannerConexion(true); });
 var streamActual = null;
 var lectorZXing = null;
 var escaneando = false;
@@ -390,6 +432,7 @@ function procesarCodigo(codigo) {
   if (cacheCodigos[codigo]) { agregarAlCarro(cacheCodigos[codigo]); return; }
 
   Sesion.api('apiBuscarCodigo', [codigo], function (r) {
+    actualizarBannerConexion(false); // esta llamada sí llegó: hay conexión real
     if (!r.encontrado) {
       // §22 trabajador: no puede crear productos; solo volver a escanear.
       banner('✖ PRODUCTO NO REGISTRADO (' + r.codigo_barras +
@@ -401,28 +444,55 @@ function procesarCodigo(codigo) {
     cacheCodigos[codigo] = r;
     agregarAlCarro(r);
   }, function (err) {
-    banner('✖ Error de conexión: ' + ((err && err.message) || err), 'err');
+    // Solo se usa el catálogo offline ante un problema de RED real (timeout,
+    // "sin conexión", etc. — mensajes que arma llamarServidor en comun.js).
+    // Un error de negocio genuino (p. ej. "Usuario inactivo") no es un
+    // problema de conexión y debe mostrarse tal cual, sin ocultarlo detrás
+    // del catálogo local.
+    var msg = (err && err.message) || '';
+    var esProblemaDeRed = msg.indexOf('conexión') !== -1 || msg.indexOf('tardó demasiado') !== -1;
+    if (!esProblemaDeRed) {
+      banner('✖ ' + msg, 'err');
+      vibrar([200]);
+      reanudarEscaneo(2500);
+      return;
+    }
+    // Sin conexión real (aunque navigator.onLine diga que sí hay red): usar
+    // el catálogo offline para al menos identificar el producto (D-047). El
+    // stock se valida igual en el servidor al confirmar — esto es solo
+    // identificación, no se pierde ninguna validación real.
+    actualizarBannerConexion(true);
+    var infoOffline = catalogoOffline[codigo];
+    if (infoOffline) {
+      agregarAlCarro(infoOffline, true);
+      return;
+    }
+    banner('✖ Sin conexión y el código no está guardado localmente. ' +
+      'Intenta de nuevo cuando haya señal.', 'err');
     vibrar([200]);
     reanudarEscaneo(2500);
   });
 }
-function agregarAlCarro(info) {
+function agregarAlCarro(info, sinConexion) {
   if (!claveOperacion) claveOperacion = uuid(); // primer producto: nace la clave
   carro.push({
     codigo_barras: info.codigo_barras,
     producto_nombre: info.producto_nombre,
     formato_nombre: info.formato_nombre,
     unidades_por_empaque: info.unidades_por_empaque,
-    cantidad: 1
+    cantidad: 1,
+    sinVerificar: !!sinConexion // agregado offline: el stock aún no se comprobó
   });
   guardarBorrador();
   mensaje('');
-  banner('✔ AGREGADO: ' + info.producto_nombre + ' — ' + info.formato_nombre +
-    ' (' + info.unidades_por_empaque + ' unid./empaque)', 'ok');
+  banner((sinConexion ? '📡 AGREGADO (sin conexión): ' : '✔ AGREGADO: ') +
+    info.producto_nombre + ' — ' + info.formato_nombre +
+    ' (' + info.unidades_por_empaque + ' unid./empaque)', sinConexion ? 'info' : 'ok');
   mostrarDetectado(info.producto_nombre,
     info.formato_nombre + ' (' + info.tipo_empaque + ') · ' +
-    info.unidades_por_empaque + ' unidades por empaque · Stock disponible: ' +
-    info.stock_unidades + ' unidades');
+    info.unidades_por_empaque + ' unidades por empaque · ' +
+    (sinConexion ? 'Stock: se verifica al confirmar (sin conexión ahora)'
+      : 'Stock disponible: ' + info.stock_unidades + ' unidades'));
   reanudarEscaneo();
 }
 function mostrarDetectado(nombre, datos) {
@@ -447,7 +517,9 @@ function renderCarro() {
     totalEmpaques += item.cantidad;
     totalUnidades += unidades;
     html += '<div class="item">' +
-      '<div class="info"><div class="nombre">' + esc(item.producto_nombre) + '</div>' +
+      '<div class="info"><div class="nombre">' + esc(item.producto_nombre) +
+        (item.sinVerificar ? ' <span title="Agregado sin conexión: se verifica al confirmar" ' +
+          'style="color:var(--warn)">📡</span>' : '') + '</div>' +
       '<div class="detalle">' + esc(item.formato_nombre) + ' · ' +
         item.unidades_por_empaque + ' unid./empaque</div>' +
       '<div class="unidades">' + item.cantidad + ' × ' + item.unidades_por_empaque +
@@ -521,6 +593,7 @@ function confirmarRetiro() {
       return { codigo_barras: i.codigo_barras, cantidad_empaques: i.cantidad };
     })
   }], function (r) {
+    actualizarBannerConexion(false);
     limpiarBorrador();
     carro = [];
     var lineas = r.detalles.map(function (d) {
@@ -567,9 +640,11 @@ function renderMisRetiros() {
 
 // Retiro: disponible para TRABAJADOR y JEFATURA; el servidor valida la
 // sesión en cada operación y registra al usuario autenticado como responsable.
+actualizarBannerConexion(!navigator.onLine);
 Sesion.asegurar(null, function () {
   renderMisRetiros();
   restaurarBorrador();
+  cargarCatalogoOffline();
 });
 </script>
 </body>

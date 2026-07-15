@@ -94,6 +94,7 @@ const projectGlobals = {
   catalogoAdvertenciaDesactivacion_: 'readonly',
   catalogoValidarCodigoBarrasUnico_: 'readonly',
   catalogoBuscarPorCodigoBarras_: 'readonly',
+  catalogoListarOffline_: 'readonly',
   catalogoExportarCsv_: 'readonly',
   // Importacion.gs
   importacionPlantillaCsv_: 'readonly',
@@ -145,6 +146,7 @@ const projectGlobals = {
   apiLogout: 'readonly',
   apiSesionInfo: 'readonly',
   apiBuscarCodigo: 'readonly',
+  apiCatalogoOffline: 'readonly',
   apiRetiroConfirmar: 'readonly',
   apiMisMovimientos: 'readonly',
   apiIngresoConfirmar: 'readonly',

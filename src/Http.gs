@@ -17,6 +17,7 @@ function httpFunciones_() {
     apiLogout: apiLogout,
     apiSesionInfo: apiSesionInfo,
     apiBuscarCodigo: apiBuscarCodigo,
+    apiCatalogoOffline: apiCatalogoOffline,
     apiRetiroConfirmar: apiRetiroConfirmar,
     apiMisMovimientos: apiMisMovimientos,
     apiIngresoConfirmar: apiIngresoConfirmar,

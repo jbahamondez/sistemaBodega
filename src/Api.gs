@@ -35,6 +35,16 @@ function apiBuscarCodigo(token, codigoBarras) {
   return movBuscarCodigo_(codigoBarras);
 }
 
+/**
+ * Catálogo liviano para cachear localmente (D-047): permite reconocer un
+ * código escaneado sin depender de la red en ese instante. Sin stock a
+ * propósito — el stock siempre se valida en el servidor al confirmar.
+ */
+function apiCatalogoOffline(token) {
+  authValidar_(token);
+  return catalogoListarOffline_();
+}
+
 /** Confirma un retiro. El responsable es SIEMPRE el usuario de la sesión. */
 function apiRetiroConfirmar(token, datos) {
   var u = authValidar_(token);
