@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Guía rápida — Trabajador</title>
+<style>
+  @page { size: A4; margin: 13mm 15mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Georgia, "Times New Roman", serif; color: #2b2018;
+    font-size: 10pt; line-height: 1.45; }
+  .cabecera { border-bottom: 3px double #b08d57; padding-bottom: 10px; margin-bottom: 14px; }
+  .marca { font-size: 9pt; letter-spacing: .25em; text-transform: uppercase; color: #8a6d4a; }
+  h1 { font-size: 20pt; font-weight: normal; color: #3e2723; margin-top: 4px; }
+  .subtitulo { font-size: 10pt; color: #6d5b48; font-style: italic; margin-top: 2px; }
+  h2 { font-size: 10.5pt; letter-spacing: .16em; text-transform: uppercase; font-weight: normal;
+    color: #3e2723; border-bottom: 1px solid #d9c9b2; padding-bottom: 3px; margin: 14px 0 6px; }
+  ol { margin: 6px 0 6px 22px; }
+  ul { margin: 6px 0 6px 22px; }
+  li { margin-bottom: 4px; }
+  .paso { font-weight: bold; color: #3e2723; }
+  .caja { border: 1px solid #d9c9b2; border-left: 4px solid #b08d57; background: #faf7f2;
+    padding: 9px 12px; margin: 10px 0; font-size: 9.5pt; }
+  .caja strong { color: #3e2723; }
+  .boton { font-family: Arial, sans-serif; font-size: 8.5pt; background: #4e342e; color: #fff;
+    padding: 1px 7px; border-radius: 3px; white-space: nowrap; }
+  .boton.verde { background: #2e7d32; }
+  .boton.borde { background: #fff; color: #4e342e; border: 1px solid #4e342e; }
+  .pie { margin-top: 16px; padding-top: 7px; border-top: 1px solid #d9c9b2;
+    font-size: 8pt; color: #8a6d4a; display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+
+<div class="cabecera">
+  <div class="marca">Sistema Bodega · Control y Trazabilidad</div>
+  <h1>Guía rápida — Trabajador</h1>
+  <div class="subtitulo">Registro de retiros de bodega desde el celular</div>
+</div>
+
+<h2>1 · Entrar al sistema</h2>
+<ol>
+  <li>Abre la dirección del sistema en Chrome (guárdala en favoritos o en la pantalla de inicio).</li>
+  <li>Escribe tu <span class="paso">identificador</span> y tu <span class="paso">PIN</span> (mínimo 6 dígitos) y toca <span class="boton">Entrar</span>.</li>
+  <li>En el inicio verás la opción <span class="paso">📷 Registrar retiro</span>. Esa es tu pantalla de trabajo.</li>
+</ol>
+
+<h2>2 · Registrar un retiro (llevar productos de bodega a tienda)</h2>
+<ol>
+  <li>Toca <span class="boton">📷 REGISTRAR RETIRO</span> y luego <span class="boton">📷 ESCANEAR CAJA / DISPLAY</span>.</li>
+  <li>Apunta la cámara al código de barras de la caja o display. Cada lectura correcta vibra, suena y <span class="paso">agrega 1 empaque</span>. Escanea de nuevo el mismo código para sumar otro.</li>
+  <li>¿La cámara no lee el código? Escríbelo en el campo de abajo y toca <span class="boton borde">Agregar código escrito</span>.</li>
+  <li>Cuando termines, toca <span class="boton">Terminar de escanear</span> para revisar tu retiro.</li>
+  <li>En la lista puedes ajustar cantidades con <span class="paso">− / +</span> o quitar un producto con el basurero.</li>
+  <li>Toca <span class="boton verde">CONFIRMAR RETIRO</span>. Recién ahí el sistema descuenta el stock.</li>
+</ol>
+
+<div class="caja">
+  <strong>Importante:</strong> primero confirma en el sistema, <strong>después</strong> retira
+  físicamente los productos de la bodega. Así el stock siempre refleja la realidad.
+</div>
+
+<h2>3 · Si no hay señal en la bodega</h2>
+<ul>
+  <li>Aparece un aviso naranjo: <span class="paso">📡 Sin conexión</span>. Puedes seguir escaneando: los productos conocidos se agregan igual, marcados con 📡.</li>
+  <li>El retiro se guarda en tu celular. Cuando vuelva la señal, toca <span class="boton verde">CONFIRMAR RETIRO</span> de nuevo — el sistema nunca duplica un retiro por reintentar.</li>
+  <li>Si cierras la aplicación a medio retiro, no se pierde nada: al volver a entrar, tu retiro en preparación sigue ahí.</li>
+</ul>
+
+<h2>4 · Situaciones frecuentes</h2>
+<ul>
+  <li><span class="paso">"Producto no registrado":</span> ese código no está en el catálogo. Avisa a jefatura para que lo cree; no puedes crearlo tú.</li>
+  <li><span class="paso">Te equivocaste en una cantidad ya confirmada:</span> avisa a jefatura — puede corregir el retiro desde su panel sin borrar nada.</li>
+  <li><span class="paso">"Mis retiros recientes"</span> en el inicio muestra tus últimos retiros confirmados, con fecha, cantidades y destino.</li>
+</ul>
+
+<h2>5 · Salir</h2>
+<ul>
+  <li>Toca <span class="boton borde">Salir</span> (arriba a la derecha) al terminar tu turno, especialmente si el celular es compartido.</li>
+</ul>
+
+<div class="pie">
+  <span>Sistema de Control y Trazabilidad de Bodega — Guía del Trabajador</span>
+  <span>Uso interno</span>
+</div>
+
+</body>
+</html>

@@ -260,6 +260,7 @@
           <select id="f-producto"><option value="">Todos</option></select>
         </label>
         <button class="primario" onclick="cargarMovimientos()">Filtrar</button>
+        <button class="accion" onclick="generarInforme()">Generar informe PDF</button>
       </div>
       <div id="lista-movimientos"><p class="muted">Usa los filtros y presiona Filtrar.</p></div>
     </div>
@@ -991,6 +992,7 @@ function cargarMovimientos() {
   document.getElementById('lista-movimientos').innerHTML = '<p class="muted">Buscando…</p>';
   llamar('apiMovListar', [filtros], function (movs) {
     movs = movs || [];
+    movimientosFiltrados = movs; // para "Generar informe PDF" (D-049)
     var html = tablaMovimientos(movs);
     // Si llegó justo el tope, probablemente hay más: avisar y sugerir filtrar.
     if (movs.length >= MOV_LIMITE_PANEL) {
@@ -1000,6 +1002,136 @@ function cargarMovimientos() {
     }
     document.getElementById('lista-movimientos').innerHTML = html;
   });
+}
+
+// ------------------------ informe ejecutivo (D-049) -------------------------
+// Genera una vista de impresión elegante en una ventana nueva y abre el
+// diálogo de imprimir del navegador: "Guardar como PDF" produce el informe.
+// Sin librerías externas — el navegador es el motor de PDF.
+var movimientosFiltrados = null; // último resultado del filtro de Movimientos
+
+function generarInforme() {
+  var filtros = {
+    desde: document.getElementById('f-desde').value,
+    hasta: document.getElementById('f-hasta').value,
+    tipo: document.getElementById('f-tipo').value,
+    productoId: document.getElementById('f-producto').value,
+    limite: MOV_LIMITE_PANEL
+  };
+  if (movimientosFiltrados !== null) {
+    abrirInforme(movimientosFiltrados, filtros);
+    return;
+  }
+  llamar('apiMovListar', [filtros], function (movs) {
+    movimientosFiltrados = movs || [];
+    abrirInforme(movimientosFiltrados, filtros);
+  });
+}
+
+function abrirInforme(movs, filtros) {
+  var sesion = Sesion.datos() || {};
+  var ahora = new Date();
+  var fechaGeneracion = ahora.toLocaleDateString('es-CL',
+    { day: 'numeric', month: 'long', year: 'numeric' }) + ', ' +
+    ahora.toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
+
+  // Período: el de los filtros o, si no hay, el rango real de los datos.
+  var fechas = movs.map(function (m) { return m.fecha_hora.slice(0, 10); }).sort();
+  var desde = filtros.desde || (fechas[0] || '—');
+  var hasta = filtros.hasta || (fechas[fechas.length - 1] || '—');
+
+  var porTipo = { ENTRADA: { n: 0, unidades: 0 }, RETIRO: { n: 0, unidades: 0 },
+    AJUSTE: { n: 0, unidades: 0 }, REVERSA: { n: 0, unidades: 0 } };
+  movs.forEach(function (m) {
+    var t = porTipo[m.tipo];
+    if (!t) return;
+    t.n += 1;
+    t.unidades += parseInt(m.total_unidades, 10) || 0;
+  });
+
+  var filasHtml = movs.map(function (m) {
+    return '<tr><td>' + esc(m.movimiento_id) + '</td><td>' + esc(m.fecha_hora) + '</td>' +
+      '<td><span class="tipo t-' + esc(m.tipo) + '">' + esc(m.tipo) + '</span></td>' +
+      '<td>' + esc(m.usuario_nombre_snapshot) + '</td>' +
+      '<td>' + esc(m.origen) + ' → ' + esc(m.destino) + '</td>' +
+      '<td class="num">' + esc(m.total_empaques) + '</td>' +
+      '<td class="num">' + esc(m.total_unidades) + '</td></tr>';
+  }).join('');
+
+  var html = '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">' +
+    '<title>Informe de movimientos — Sistema Bodega</title><style>' +
+    '@page { size: A4; margin: 18mm 16mm; }' +
+    '* { box-sizing: border-box; margin: 0; padding: 0; }' +
+    'body { font-family: Georgia, "Times New Roman", serif; color: #2b2018;' +
+    '  font-size: 10.5pt; line-height: 1.5; }' +
+    '.cabecera { border-bottom: 3px double #b08d57; padding-bottom: 14px;' +
+    '  margin-bottom: 22px; display: flex; justify-content: space-between;' +
+    '  align-items: flex-end; }' +
+    '.marca { font-size: 9pt; letter-spacing: .25em; text-transform: uppercase;' +
+    '  color: #8a6d4a; }' +
+    'h1 { font-size: 21pt; font-weight: normal; color: #3e2723; margin-top: 4px;' +
+    '  letter-spacing: .02em; }' +
+    '.meta { text-align: right; font-size: 9pt; color: #6d5b48; }' +
+    '.meta strong { color: #3e2723; }' +
+    '.resumen { display: flex; gap: 14px; margin-bottom: 24px; }' +
+    '.cifra { flex: 1; border: 1px solid #d9c9b2; border-top: 3px solid #b08d57;' +
+    '  padding: 10px 12px; background: #faf7f2; }' +
+    '.cifra strong { display: block; font-size: 16pt; color: #3e2723; }' +
+    '.cifra span { font-size: 8pt; letter-spacing: .12em; text-transform: uppercase;' +
+    '  color: #8a6d4a; }' +
+    'h2 { font-size: 11pt; letter-spacing: .18em; text-transform: uppercase;' +
+    '  font-weight: normal; color: #3e2723; border-bottom: 1px solid #d9c9b2;' +
+    '  padding-bottom: 5px; margin: 22px 0 10px; }' +
+    'table { width: 100%; border-collapse: collapse; font-size: 9pt; }' +
+    'th { text-align: left; font-weight: normal; letter-spacing: .08em;' +
+    '  text-transform: uppercase; font-size: 7.5pt; color: #8a6d4a;' +
+    '  border-bottom: 1.5px solid #b08d57; padding: 5px 7px; }' +
+    'td { padding: 5px 7px; border-bottom: .5px solid #e8dfd2; }' +
+    'td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }' +
+    'tr { page-break-inside: avoid; } thead { display: table-header-group; }' +
+    '.tipo { font-size: 7.5pt; letter-spacing: .08em; }' +
+    '.t-ENTRADA { color: #33691e; } .t-RETIRO { color: #8d2f23; }' +
+    '.t-AJUSTE { color: #9c6b1e; } .t-REVERSA { color: #4a3aa7; }' +
+    '.pie { margin-top: 26px; padding-top: 10px; border-top: 1px solid #d9c9b2;' +
+    '  font-size: 8pt; color: #8a6d4a; display: flex; justify-content: space-between; }' +
+    '.sin-datos { padding: 30px 0; text-align: center; color: #8a6d4a; font-style: italic; }' +
+    '</style></head><body>' +
+    '<div class="cabecera"><div>' +
+    '<div class="marca">Sistema Bodega · Control y Trazabilidad</div>' +
+    '<h1>Informe de Movimientos</h1></div>' +
+    '<div class="meta">Período: <strong>' + esc(desde) + '</strong> al <strong>' +
+    esc(hasta) + '</strong>' +
+    (filtros.tipo ? '<br>Tipo: <strong>' + esc(filtros.tipo) + '</strong>' : '') +
+    '<br>Generado el ' + esc(fechaGeneracion) +
+    '<br>Por: <strong>' + esc(sesion.nombre || '—') + '</strong></div></div>' +
+    '<div class="resumen">' +
+    '<div class="cifra"><strong>' + movs.length + '</strong><span>Movimientos</span></div>' +
+    '<div class="cifra"><strong>' + fmtNum(porTipo.ENTRADA.unidades) + '</strong>' +
+    '<span>Unid. ingresadas</span></div>' +
+    '<div class="cifra"><strong>' + fmtNum(porTipo.RETIRO.unidades) + '</strong>' +
+    '<span>Unid. retiradas</span></div>' +
+    '<div class="cifra"><strong>' + (porTipo.AJUSTE.n + porTipo.REVERSA.n) + '</strong>' +
+    '<span>Ajustes y reversas</span></div></div>' +
+    '<h2>Detalle de movimientos</h2>' +
+    (movs.length === 0
+      ? '<p class="sin-datos">Sin movimientos para los filtros seleccionados.</p>'
+      : '<table><thead><tr><th>ID</th><th>Fecha y hora</th><th>Tipo</th>' +
+        '<th>Responsable</th><th>Origen → Destino</th><th class="num">Empaques</th>' +
+        '<th class="num">Unidades</th></tr></thead><tbody>' + filasHtml + '</tbody></table>') +
+    '<div class="pie"><span>Documento generado automáticamente por el Sistema de ' +
+    'Control y Trazabilidad de Bodega.</span><span>Uso interno</span></div>' +
+    '</body></html>';
+
+  var ventana = window.open('', '_blank');
+  if (!ventana) {
+    Ui.toast('El navegador bloqueó la ventana del informe. Permite las ventanas ' +
+      'emergentes para este sitio.', 'err');
+    return;
+  }
+  ventana.document.write(html);
+  ventana.document.close();
+  // Esperar el render antes de abrir el diálogo (ahí se elige "Guardar como PDF").
+  ventana.onload = function () { ventana.print(); };
 }
 function abrirDetalle(movimientoId) {
   llamar('apiMovObtenerDetalle', [movimientoId], function (r) {

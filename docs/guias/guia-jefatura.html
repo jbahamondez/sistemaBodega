@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Guía rápida — Jefatura</title>
+<style>
+  @page { size: A4; margin: 16mm 15mm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Georgia, "Times New Roman", serif; color: #2b2018;
+    font-size: 10pt; line-height: 1.5; }
+  .cabecera { border-bottom: 3px double #b08d57; padding-bottom: 12px; margin-bottom: 18px; }
+  .marca { font-size: 9pt; letter-spacing: .25em; text-transform: uppercase; color: #8a6d4a; }
+  h1 { font-size: 20pt; font-weight: normal; color: #3e2723; margin-top: 4px; }
+  .subtitulo { font-size: 10pt; color: #6d5b48; font-style: italic; margin-top: 2px; }
+  h2 { font-size: 10.5pt; letter-spacing: .16em; text-transform: uppercase; font-weight: normal;
+    color: #3e2723; border-bottom: 1px solid #d9c9b2; padding-bottom: 4px; margin: 16px 0 7px; }
+  ol, ul { margin: 5px 0 5px 22px; }
+  li { margin-bottom: 3px; }
+  .paso { font-weight: bold; color: #3e2723; }
+  .caja { border: 1px solid #d9c9b2; border-left: 4px solid #b08d57; background: #faf7f2;
+    padding: 8px 12px; margin: 9px 0; font-size: 9pt; }
+  .caja strong { color: #3e2723; }
+  .boton { font-family: Arial, sans-serif; font-size: 8pt; background: #4e342e; color: #fff;
+    padding: 1px 7px; border-radius: 3px; white-space: nowrap; }
+  .boton.borde { background: #fff; color: #4e342e; border: 1px solid #4e342e; }
+  .salto { page-break-before: always; }
+  .pie { margin-top: 20px; padding-top: 8px; border-top: 1px solid #d9c9b2;
+    font-size: 8pt; color: #8a6d4a; display: flex; justify-content: space-between; }
+</style>
+</head>
+<body>
+
+<div class="cabecera">
+  <div class="marca">Sistema Bodega · Control y Trazabilidad</div>
+  <h1>Guía rápida — Jefatura</h1>
+  <div class="subtitulo">Ingresos, catálogo, panel de control y administración</div>
+</div>
+
+<h2>1 · Ingreso de mercadería (PC con pistola escaneadora)</h2>
+<ol>
+  <li>Entra a <span class="paso">Ingreso</span>. El cursor debe estar siempre en el campo de escaneo (la página lo mantiene ahí sola).</li>
+  <li>Escanea cada caja con la pistola: cada lectura suma 1 empaque; el mismo código vuelve a sumar.</li>
+  <li>Si el código <span class="paso">no está registrado</span>, el sistema ofrece crear el producto ahí mismo: completa nombre, formato, tipo y unidades por empaque — queda en el catálogo y se agrega al ingreso de una vez.</li>
+  <li>Ajusta cantidades en la tabla si es necesario, agrega una observación (proveedor, n° de guía) y presiona <span class="boton">CONFIRMAR INGRESO</span>. Recién ahí sube el stock.</li>
+</ol>
+
+<h2>2 · Catálogo</h2>
+<ul>
+  <li><span class="paso">Crear / editar:</span> productos y sus formatos (cada formato tiene su propio código de barras y equivalencia en unidades).</li>
+  <li><span class="paso">Importar planilla:</span> pestaña Importar/Exportar → cargar el archivo CSV → <span class="boton borde">Previsualizar</span> (muestra qué es nuevo, qué se actualiza y qué errores hay) → <span class="boton">Confirmar importación</span>. Acepta la planilla real (Cod producto / Descripción / EAN / EAN CAJA / Cantidad): si una fila trae ambos códigos, ambos quedan escaneables.</li>
+  <li><span class="paso">Desactivar vs. Eliminar:</span> desactivar oculta el producto conservando todo su historial (siempre posible); eliminar es definitivo y solo se permite si el producto nunca tuvo stock ni movimientos.</li>
+  <li><span class="paso">Exportar:</span> descarga el catálogo completo como CSV reimportable.</li>
+</ul>
+
+<h2>3 · Panel — Dashboard</h2>
+<ul>
+  <li><span class="paso">Alertas de stock:</span> tablas de productos agotados y bajo mínimo (el umbral se cambia en Configuración).</li>
+  <li><span class="paso">Métricas y tendencias:</span> comparación semanal de retiros, movimientos por día, evolución del stock, top 10 de rotación y actividad por usuario. Cada gráfico se pliega/despliega tocando su título, y el panel se actualiza solo cada 30 segundos (botón <span class="boton borde">Actualizar</span> para forzarlo).</li>
+  <li>Si aparece una alerta de <span class="paso">movimientos a medio confirmar</span>, hubo un corte a mitad de una operación: revisa el movimiento indicado y reconcilia el stock si corresponde.</li>
+</ul>
+
+<h2>4 · Panel — Movimientos y correcciones</h2>
+<ul>
+  <li>Filtra por fechas, tipo o producto y haz clic en un movimiento para ver su detalle completo (con stock antes/después por producto).</li>
+  <li><span class="paso">Corregir cantidades</span> (solo retiros): ingresa la cantidad real por producto y el motivo; el sistema aplica la diferencia como un ajuste enlazado. El retiro original nunca se modifica.</li>
+  <li><span class="paso">Revertir movimiento:</span> deshace el movimiento completo creando una reversa con las cantidades opuestas.</li>
+  <li><span class="paso">Generar informe PDF:</span> con los filtros aplicados, crea el informe ejecutivo del período — en el diálogo de impresión elige "Guardar como PDF".</li>
+  <li><span class="paso">Trazabilidad:</span> historial completo de un producto, movimiento por movimiento.</li>
+</ul>
+
+<div class="caja">
+  <strong>Principio del sistema:</strong> el historial nunca se edita ni se borra. Toda
+  corrección es un movimiento nuevo, auditado, con responsable y motivo. Por eso siempre
+  se puede reconstruir qué pasó.
+</div>
+
+<h2 class="salto">5 · Panel — Ajustes de stock</h2>
+<ul>
+  <li>Para diferencias de conteo físico: elige producto, formato, sumar o restar, cantidad y un <span class="paso">motivo obligatorio</span>. Queda registrado como movimiento AJUSTE a tu nombre.</li>
+</ul>
+
+<h2>6 · Panel — Usuarios</h2>
+<ul>
+  <li>Crea cuentas con nombre, identificador, rol (<span class="paso">TRABAJADOR</span> o <span class="paso">JEFATURA</span>) y PIN inicial de 6+ dígitos.</li>
+  <li>Puedes editar, cambiar rol, restablecer PIN o <span class="paso">desactivar</span> (recomendado ante rotación de personal). Eliminar solo es posible si el usuario nunca registró movimientos.</li>
+  <li>Tras 5 intentos fallidos de PIN, la cuenta se bloquea por 15 minutos automáticamente.</li>
+</ul>
+
+<h2>7 · Panel — Configuración</h2>
+<ul>
+  <li><span class="paso">Stock mínimo:</span> umbral de la alerta "bajo mínimo" del Dashboard.</li>
+  <li><span class="paso">Retención de respaldos:</span> días que se conservan las copias automáticas diarias de la base en Google Drive.</li>
+  <li><span class="paso">Tope de movimientos:</span> máximo de movimientos por listado (rendimiento).</li>
+  <li>También puedes pausar la auto-actualización del panel.</li>
+</ul>
+
+<h2>8 · Buenas prácticas</h2>
+<ul>
+  <li>Comunica los PIN de forma segura y pide cambiarlos ante cualquier duda (Usuarios → Restablecer PIN).</li>
+  <li>Prefiere <span class="paso">desactivar</span> antes que eliminar — conserva la trazabilidad.</li>
+  <li>El sistema respalda la base todos los días a las ~03:00 en la carpeta "Respaldos - Sistema Bodega" de Google Drive. Ante un problema grave de datos, esa copia es tu punto de restauración.</li>
+  <li>Ante cortes de señal en la bodega, los trabajadores pueden seguir escaneando: el stock se valida al confirmar y los reintentos nunca duplican movimientos.</li>
+</ul>
+
+<div class="pie">
+  <span>Sistema de Control y Trazabilidad de Bodega — Guía de Jefatura</span>
+  <span>Uso interno</span>
+</div>
+
+</body>
+</html>

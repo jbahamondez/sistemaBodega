@@ -867,3 +867,35 @@ formato propios). La derivación del sufijo es determinista, así que
 reimportar la misma planilla clasifica todo como SIN_CAMBIOS (no duplica).
 Columna nueva en `CONFIG.IMPORT_PLANILLA`: `codigo_barras_caja`, alias
 "ean caja", opcional. Prueba: `testImportEanCaja_`.
+
+## D-049 — Entrega al cliente: informe PDF ejecutivo y guías de uso
+
+Preparación para entregar el sistema al cliente final. Tres piezas:
+
+**Informe PDF de movimientos** (`generarInforme()` en `web/panel.html`,
+botón "Generar informe PDF" junto a los filtros de Movimientos): genera una
+vista de impresión con estilo ejecutivo (tipografía serif, paleta chocolate
+y dorado, cabecera con período/generado por, tarjetas de resumen por tipo,
+tabla completa del período filtrado) en una ventana nueva y abre el diálogo
+de imprimir — "Guardar como PDF" produce el documento. Se eligió el motor
+de PDF del propio navegador en vez de una librería (jsPDF u otras): cero
+dependencias nuevas, cero superficie de supply-chain (M9) y tipografía
+nativa. Usa el último resultado del filtro (o lo consulta si aún no se ha
+filtrado). Sin cambios de backend.
+
+**Guías de uso** (`docs/guias/`): `guia-trabajador` (1 página: login,
+retiro con cámara, modo sin señal, situaciones frecuentes) y
+`guia-jefatura` (2 páginas: ingreso con pistola + alta rápida, catálogo e
+importación EAN/EAN CAJA, dashboard, correcciones, ajustes, usuarios,
+configuración, buenas prácticas). Fuente HTML + PDF generado con Edge
+headless (`msedge --headless --print-to-pdf`), mismo lenguaje visual del
+informe. Los PDF se versionan en el repo para entregarlos tal cual.
+
+Además quedó definido el procedimiento de reinicio de datos para la
+entrega (manual, sin código nuevo): respaldar la planilla, eliminar las
+hojas de datos, poner los contadores `contador_*` de Configuracion en 0,
+re-ejecutar `setupDatabase()` (recrea todo con encabezados actualizados —
+cierra de paso el pendiente del encabezado `clave_idempotencia` de D-029)
+y crear la cuenta real de jefatura con `setupCrearUsuarioJefatura()`.
+D-047 (offline) quedó confirmado funcionando por el usuario en dispositivo
+real.
