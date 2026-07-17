@@ -833,3 +833,37 @@ reconocible ("Sin conexión con el servidor…" / "El servidor tardó
 demasiado…"), descartando el texto crudo del navegador — todo lo que cae
 ahí es, por diseño, un problema de red (los errores de negocio ya se
 resuelven antes, en el `.then()`).
+
+## D-048 — Columna "EAN CAJA" en la planilla: dos códigos escaneables por empaque
+
+Pedido por el usuario: la planilla real ahora trae una segunda columna
+"EAN CAJA" además del "EAN", y un producto escaneado debe reconocerse por
+cualquiera de los dos códigos. Confirmado con el usuario: ambos códigos
+identifican el MISMO empaque con la misma Cantidad (no son empaques
+distintos con cantidades diferentes).
+
+Diseño elegido: el modelo de datos ya soporta esto sin cambios (un
+producto, varios formatos, cada uno con su código; el escaneo ya busca en
+todos los formatos). Solo cambió la IMPORTACIÓN: cada fila física de la
+planilla se expande en 1-2 filas lógicas (`importacionExpandirFila_`)
+ANTES de validar y clasificar:
+
+- Sin EAN CAJA (o igual al EAN): la fila queda tal cual — una planilla sin
+  la columna nueva importa exactamente igual que antes.
+- Ambos códigos distintos: se agrega una fila lógica extra → un formato
+  adicional del mismo producto con el código de caja, la misma cantidad y
+  el nombre sufijado " (caja)" (p. ej. "Caja x 6 (caja)") para
+  distinguirlos en el catálogo.
+- EAN vacío pero EAN CAJA presente: el código de caja pasa a ser el
+  principal (la fila ya no falla por "codigo_barras obligatorio").
+
+Como cada fila lógica pasa completa por el mismo circuito (validación,
+duplicados dentro del archivo — que ahora también detecta un EAN CAJA
+repetido o chocando con el EAN de otra fila —, clasificación
+NUEVO/ACTUALIZAR/SIN_CAMBIOS y aplicación en lote), no hubo que tocar ni
+`importacionAplicarEnLote_` ni el frontend: la previsualización muestra la
+variante como una fila más (mismo número de fila, código y nombre de
+formato propios). La derivación del sufijo es determinista, así que
+reimportar la misma planilla clasifica todo como SIN_CAMBIOS (no duplica).
+Columna nueva en `CONFIG.IMPORT_PLANILLA`: `codigo_barras_caja`, alias
+"ean caja", opcional. Prueba: `testImportEanCaja_`.

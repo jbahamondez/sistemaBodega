@@ -173,7 +173,8 @@ function runMovimientoTests() {
     testPlanillaRealChocolateria_, testGestionUsuarios_, testEstadoLote_,
     testIdempotencia_, testFormulaInjection_,
     testAjusteReversa_, testMovLimite_, testPendientesAntiguos_,
-    testEliminarCatalogo_, testParametros_, testPanelMetricas_, testCatalogoOffline_];
+    testEliminarCatalogo_, testParametros_, testPanelMetricas_, testCatalogoOffline_,
+    testImportEanCaja_];
   tests.forEach(function (t) {
     try {
       t();
@@ -641,6 +642,52 @@ function testPlanillaRealChocolateria_() {
     'AGREGAR_Y_ACTUALIZAR');
   assert_(prevOficial.ok && prevOficial.filas[0].datos.tipo_empaque === 'DISPLAY',
     'plantilla oficial: sin cambios de comportamiento');
+}
+
+/**
+ * D-048: la columna "EAN CAJA" de la planilla real genera un segundo formato
+ * del MISMO producto (misma cantidad, nombre sufijado " (caja)"), y ambos
+ * códigos quedan escaneables. Si el EAN principal viene vacío, el código de
+ * caja lo reemplaza.
+ */
+function testImportEanCaja_() {
+  var cab = 'Cod producto,Descripcion del producto (Nombre),EAN,EAN CAJA,Cantidad\n';
+  var csv = cab +
+    'DUAL-01,Trufa Doble Codigo,DUAL780111,DUAL780999,6\n' +
+    'DUAL-02,Turron Sin Ean,,DUAL780555,12\n';
+
+  var prev = importacionPrevisualizar_(csv, 'AGREGAR_Y_ACTUALIZAR');
+  assert_(prev.ok && prev.resumen.NUEVO === 3 && prev.resumen.ERROR === 0,
+    'D-048: 2 filas físicas se expanden en 3 filas lógicas nuevas, sin errores');
+
+  var res = importacionAplicar_(csv, 'AGREGAR_Y_ACTUALIZAR', 'ean_caja.csv');
+  assert_(res.detalle.productosCreados === 2 && res.detalle.formatosCreados === 3,
+    'D-048: se crean 2 productos y 3 formatos');
+
+  var porEan = catalogoBuscarPorCodigoBarras_('DUAL780111');
+  var porCaja = catalogoBuscarPorCodigoBarras_('DUAL780999');
+  assert_(porEan && porCaja &&
+    porEan.producto.producto_id === porCaja.producto.producto_id,
+    'D-048: ambos códigos reconocen el MISMO producto al escanear');
+  assert_(utilToInt(porCaja.formato.unidades_por_empaque) === 6 &&
+    porCaja.formato.nombre_formato === 'Caja x 6 (caja)',
+    'D-048: el formato de caja hereda la cantidad y lleva el sufijo " (caja)"');
+
+  var sinEan = catalogoBuscarPorCodigoBarras_('DUAL780555');
+  assert_(sinEan && sinEan.producto.nombre === 'Turron Sin Ean' &&
+    utilToInt(sinEan.formato.unidades_por_empaque) === 12,
+    'D-048: con EAN vacío, el EAN CAJA pasa a ser el código principal');
+
+  // Reimportar la misma planilla no duplica nada: todo SIN_CAMBIOS.
+  var prev2 = importacionPrevisualizar_(csv, 'AGREGAR_Y_ACTUALIZAR');
+  assert_(prev2.resumen.SIN_CAMBIOS === 3 && prev2.resumen.NUEVO === 0,
+    'D-048: reimportar la misma planilla clasifica todo como SIN_CAMBIOS');
+
+  // Mismo código en ambas columnas: NO se crea un segundo formato.
+  var csvIgual = cab + 'DUAL-03,Gato Codigo Unico,DUAL780777,DUAL780777,4\n';
+  var prevIgual = importacionPrevisualizar_(csvIgual, 'AGREGAR_Y_ACTUALIZAR');
+  assert_(prevIgual.resumen.NUEVO === 1,
+    'D-048: EAN y EAN CAJA idénticos generan un solo formato, sin duplicado');
 }
 
 /**

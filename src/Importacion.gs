@@ -26,6 +26,11 @@ function importacionInstrucciones_() {
       'unidades_por_empaque son obligatorios.',
     'codigo_producto es opcional pero recomendado: es el identificador ' +
       'estable del producto entre importaciones.',
+    'codigo_barras_caja (o "EAN CAJA") es opcional: un segundo código del ' +
+      'mismo empaque. Si viene, se crea un formato adicional con ese código ' +
+      'y la misma cantidad, y escanear cualquiera de los dos códigos ' +
+      'reconoce el producto. Si codigo_barras viene vacío, este código lo ' +
+      'reemplaza como principal.',
     'tipo_empaque debe ser: ' + Object.keys(CONFIG.TIPOS_EMPAQUE).join(', ') + '.',
     'unidades_por_empaque: número entero mayor que 0 (cuántas unidades ' +
       'contiene la caja o display).',
@@ -94,12 +99,12 @@ function importacionPrevisualizar_(csvText, modo) {
   var codigosEnArchivo = {};
   var filasResultado = [];
 
-  for (var r = 1; r < parsed.rows.length; r++) {
-    var numFila = r + 1; // número de fila visible en la planilla
-    var datos = importacionLeerFila_(parsed.rows[r], indice);
+  function clasificarFilaLogica(numFila, datos) {
     var errores = importacionValidarFila_(datos);
 
-    // Caso 9: código duplicado dentro del mismo archivo.
+    // Caso 9: código duplicado dentro del mismo archivo. Cubre también los
+    // segundos formatos de "EAN CAJA" (D-048): un código de caja repetido, o
+    // igual al EAN de otra fila, se reporta como duplicado.
     if (datos.codigo_barras) {
       if (codigosEnArchivo[datos.codigo_barras]) {
         errores.push('Código de barras duplicado en el archivo (también en fila ' +
@@ -121,7 +126,7 @@ function importacionPrevisualizar_(csvText, modo) {
     if (errores.length > 0) {
       fila.estado = CONFIG.ESTADOS_FILA_IMPORT.ERROR;
       filasResultado.push(fila);
-      continue;
+      return;
     }
 
     // Identificación (§8.7): formato por código de barras; producto por
@@ -153,6 +158,15 @@ function importacionPrevisualizar_(csvText, modo) {
     }
 
     filasResultado.push(fila);
+  }
+
+  for (var r = 1; r < parsed.rows.length; r++) {
+    // Una fila física puede volverse 1-2 filas lógicas (EAN + EAN CAJA, D-048);
+    // r + 1 es el número de fila visible en la planilla.
+    var variantes = importacionExpandirFila_(importacionLeerFila_(parsed.rows[r], indice));
+    for (var v = 0; v < variantes.length; v++) {
+      clasificarFilaLogica(r + 1, variantes[v]);
+    }
   }
 
   var resumen = { total: filasResultado.length };
@@ -250,6 +264,7 @@ function importacionLeerFila_(row, indice) {
     nombre_producto: leer('nombre_producto'),
     categoria: leer('categoria'),
     codigo_barras: utilNormalizeBarcode(leer('codigo_barras')),
+    codigo_barras_caja: utilNormalizeBarcode(leer('codigo_barras_caja')),
     nombre_formato: leer('nombre_formato'),
     tipo_empaque: leer('tipo_empaque').toUpperCase(),
     unidades_por_empaque: importacionNormalizarEntero_(leer('unidades_por_empaque')),
@@ -268,6 +283,32 @@ function importacionLeerFila_(row, indice) {
       : CONFIG.TIPOS_EMPAQUE.CAJA;
   }
   return datos;
+}
+
+/**
+ * Expande una fila leída en 1 o 2 filas lógicas según "EAN CAJA" (D-048):
+ * - Sin código de caja (o igual al principal): la fila queda tal cual.
+ * - EAN principal vacío pero caja presente: el código de caja pasa a ser el
+ *   principal (la fila ya no falla por "codigo_barras obligatorio").
+ * - Ambos códigos distintos: se agrega una segunda fila lógica — un formato
+ *   adicional del MISMO producto con el código de caja y la misma cantidad
+ *   (ambas columnas identifican el mismo empaque), con el nombre del formato
+ *   sufijado " (caja)" para distinguirlos en el catálogo y al escanear.
+ * Cada fila lógica pasa completa por la validación, la detección de
+ * duplicados en el archivo y la clasificación NUEVO/ACTUALIZAR/SIN_CAMBIOS.
+ */
+function importacionExpandirFila_(datos) {
+  var codigoCaja = datos.codigo_barras_caja;
+  if (!codigoCaja || codigoCaja === datos.codigo_barras) return [datos];
+  if (!datos.codigo_barras) {
+    datos.codigo_barras = codigoCaja;
+    return [datos];
+  }
+  var variante = {};
+  Object.keys(datos).forEach(function (k) { variante[k] = datos[k]; });
+  variante.codigo_barras = codigoCaja;
+  if (variante.nombre_formato) variante.nombre_formato += ' (caja)';
+  return [datos, variante];
 }
 
 /**

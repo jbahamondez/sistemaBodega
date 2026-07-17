@@ -103,6 +103,7 @@ const projectGlobals = {
   importacionAplicar_: 'readonly',
   importacionListar_: 'readonly',
   importacionLeerFila_: 'readonly',
+  importacionExpandirFila_: 'readonly',
   importacionNormalizarEntero_: 'readonly',
   importacionValidarFila_: 'readonly',
   importacionDetectarCambios_: 'readonly',

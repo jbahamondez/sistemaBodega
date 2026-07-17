@@ -175,15 +175,21 @@ var CONFIG = {
       { header: 'nombre_producto',      required: true,  aliases: ['descripcion del producto (nombre)'] },
       { header: 'categoria',            required: false, aliases: [] },
       { header: 'codigo_barras',        required: true,  aliases: ['ean'] },
+      // Segundo código del MISMO empaque (D-048): la planilla real trae
+      // "EAN CAJA" además del EAN. Si viene, la fila genera un segundo
+      // formato con ese código (misma cantidad), así el escaneo reconoce
+      // cualquiera de los dos. Si el EAN principal viene vacío, este código
+      // lo reemplaza como principal.
+      { header: 'codigo_barras_caja',   required: false, aliases: ['ean caja'] },
       { header: 'nombre_formato',       required: false, aliases: [] },
       { header: 'tipo_empaque',         required: false, aliases: [] },
       { header: 'unidades_por_empaque', required: true,  aliases: ['cantidad'] },
       { header: 'activo',               required: false, aliases: [] }
     ],
     exampleRows: [
-      ['PROD-EJ1', 'Chocolate Bitter', 'Chocolates', '780123456789', 'Display 15', 'DISPLAY', '15', 'SI'],
-      ['PROD-EJ1', 'Chocolate Bitter', 'Chocolates', '780987654321', 'Caja 90', 'CAJA', '90', 'SI'],
-      ['PROD-EJ2', 'Bombon Almendra', 'Bombones', '780333333333', 'Caja 24', 'CAJA', '24', 'SI']
+      ['PROD-EJ1', 'Chocolate Bitter', 'Chocolates', '780123456789', '780123456999', 'Display 15', 'DISPLAY', '15', 'SI'],
+      ['PROD-EJ1', 'Chocolate Bitter', 'Chocolates', '780987654321', '', 'Caja 90', 'CAJA', '90', 'SI'],
+      ['PROD-EJ2', 'Bombon Almendra', 'Bombones', '780333333333', '', 'Caja 24', 'CAJA', '24', 'SI']
     ]
   },
 
