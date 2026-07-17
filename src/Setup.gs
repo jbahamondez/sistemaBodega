@@ -168,3 +168,72 @@ function setupCrearUsuarioJefatura(nombre, identificadorAcceso, pin) {
   Logger.log('Usuario de jefatura creado: ' + usuario.usuario_id);
   return usuario.usuario_id;
 }
+
+/**
+ * Reinicio para ENTREGA: deja la base como recién instalada pero SIN datos
+ * de prueba — vacía todas las hojas de datos (productos, formatos,
+ * inventario, movimientos, detalle, historial, importaciones y USUARIOS),
+ * recrea sus encabezados actualizados y pone los contadores de ID en cero.
+ * La hoja Configuracion se conserva y sus parámetros operativos vuelven a
+ * los valores por defecto. Ejecutar UNA vez desde el editor antes de
+ * entregar el sistema al cliente; luego crear su cuenta con
+ * setupCrearUsuarioJefatura().
+ *
+ * DESTRUCTIVO E IRREVERSIBLE. Por seguridad exige la palabra de
+ * confirmación exacta, así que el botón "Ejecutar" del editor (que no pasa
+ * argumentos) NO la dispara por accidente: hay que llamarla explícitamente
+ * con setupReiniciarParaEntrega('BORRAR TODO'). No está en la whitelist
+ * HTTP (Http.gs), por lo que tampoco es invocable desde la web.
+ */
+function setupReiniciarParaEntrega(confirmacion) {
+  if (confirmacion !== 'BORRAR TODO') {
+    throw new Error(
+      'Operación DESTRUCTIVA: borra todos los datos (incluidos usuarios). ' +
+      'Para confirmar, ejecútala así: setupReiniciarParaEntrega("BORRAR TODO").');
+  }
+
+  var props = PropertiesService.getScriptProperties();
+  var spreadsheetId = props.getProperty(CONFIG.PROP_SPREADSHEET_ID);
+  if (!spreadsheetId) {
+    throw new Error('No hay base de datos configurada. Ejecuta setupDatabase() primero.');
+  }
+  var ss = SpreadsheetApp.openById(spreadsheetId);
+
+  // Borra todas las hojas de datos (todo menos Configuracion). Al eliminarlas
+  // y recrearlas con setupDatabase(), los encabezados quedan exactamente
+  // según el esquema vigente — incluido clave_idempotencia en Movimientos.
+  var borradas = [];
+  Object.keys(CONFIG.SHEETS).forEach(function (sheetKey) {
+    if (sheetKey === 'CONFIGURACION') return;
+    var sheet = ss.getSheetByName(CONFIG.SHEETS[sheetKey].name);
+    if (sheet) { ss.deleteSheet(sheet); borradas.push(CONFIG.SHEETS[sheetKey].name); }
+  });
+
+  // Recrea las hojas vacías con sus encabezados.
+  setupDatabase();
+
+  // Contadores de ID a cero: los primeros registros del cliente parten en
+  // PROD-0001, MOV-000001, etc. (setupSeedConfig_ no los reinicia porque ya
+  // existían, por eso se fuerzan aquí).
+  Object.keys(CONFIG.IDS).forEach(function (entityKey) {
+    dbSetConfigValue_(CONFIG.IDS[entityKey].counterKey, 0);
+  });
+
+  // Parámetros de Panel → Configuración de vuelta a fábrica (el cliente los
+  // ajusta luego). Se reutiliza parametrosGuardar_ para cubrir los tres,
+  // incluidos los que no viven en CONFIG.DEFAULTS (retención, tope).
+  parametrosGuardar_({
+    stock_minimo: PARAM_STOCK_MINIMO_DEFECTO,
+    backup_retencion_dias: PARAM_BACKUP_RETENCION_DEFECTO,
+    mov_limite: PARAM_MOV_LIMITE_DEFECTO
+  });
+
+  var resumen = {
+    ok: true,
+    hojasReiniciadas: borradas,
+    mensaje: 'Base reiniciada para entrega. Ahora crea la cuenta del cliente ' +
+      'con setupCrearUsuarioJefatura("Nombre", "identificador", "PIN 6+ dígitos").'
+  };
+  Logger.log(JSON.stringify(resumen, null, 2));
+  return resumen;
+}

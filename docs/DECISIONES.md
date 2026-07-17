@@ -899,3 +899,28 @@ cierra de paso el pendiente del encabezado `clave_idempotencia` de D-029)
 y crear la cuenta real de jefatura con `setupCrearUsuarioJefatura()`.
 D-047 (offline) quedó confirmado funcionando por el usuario en dispositivo
 real.
+
+## D-050 — Reinicio para entrega en una sola función
+
+El reinicio de datos para la entrega (borrar hojas + poner contadores en
+cero + recrear estructura) se documentó primero como pasos manuales, pero
+eran 8 hojas a borrar y 7 contadores a poner en cero — propenso a error
+(borrar la hoja equivocada, saltarse un contador). Se encapsuló en
+`setupReiniciarParaEntrega(confirmacion)` (Setup.gs): borra todas las hojas
+de datos (incluidos usuarios), las recrea vacías con `setupDatabase()` (así
+los encabezados quedan según el esquema vigente, cerrando de paso el
+pendiente del encabezado `clave_idempotencia`), pone los contadores en cero
+y los parámetros de Configuración en fábrica (vía `parametrosGuardar_`).
+
+Salvaguardas por ser DESTRUCTIVA: exige la confirmación exacta
+`'BORRAR TODO'` — el botón "Ejecutar" del editor no pasa argumentos, así
+que no la dispara por accidente; hay que llamarla explícitamente. No está
+en la whitelist HTTP (`httpFunciones_`), por lo que no es invocable desde la
+web, y el frontend vive en GitHub Pages (D-022), sin `google.script.run`.
+El flujo de entrega queda: `setupReiniciarParaEntrega("BORRAR TODO")` →
+`setupCrearUsuarioJefatura(...)` con los datos reales del cliente. Prueba:
+`testReinicioEntrega_` (última del runner, porque vacía la base de prueba).
+
+Nota: la cuenta de prueba con movimientos no se puede eliminar desde el
+panel (la trazabilidad lo impide, solo desactivar); este reinicio sí la
+elimina de verdad porque borra la hoja Usuarios completa.

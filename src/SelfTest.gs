@@ -174,7 +174,8 @@ function runMovimientoTests() {
     testIdempotencia_, testFormulaInjection_,
     testAjusteReversa_, testMovLimite_, testPendientesAntiguos_,
     testEliminarCatalogo_, testParametros_, testPanelMetricas_, testCatalogoOffline_,
-    testImportEanCaja_];
+    testImportEanCaja_,
+    testReinicioEntrega_]; // DEBE ir al final: vacía toda la base de prueba.
   tests.forEach(function (t) {
     try {
       t();
@@ -688,6 +689,49 @@ function testImportEanCaja_() {
   var prevIgual = importacionPrevisualizar_(csvIgual, 'AGREGAR_Y_ACTUALIZAR');
   assert_(prevIgual.resumen.NUEVO === 1,
     'D-048: EAN y EAN CAJA idénticos generan un solo formato, sin duplicado');
+}
+
+/**
+ * D-050: reinicio para entrega. Exige la confirmación exacta, vacía todas
+ * las hojas de datos (incluidos usuarios), deja los contadores en cero y
+ * los parámetros en fábrica. DEBE ejecutarse al final del runner: borra
+ * todo lo que crearon las pruebas anteriores.
+ */
+function testReinicioEntrega_() {
+  // Hay datos de pruebas previas: producto, movimientos y usuarios existen.
+  assert_(catalogoListar_().length > 0, 'precondición: hay productos antes del reinicio');
+  assert_(usuariosListar_().length > 0, 'precondición: hay usuarios antes del reinicio');
+
+  // Sin la confirmación exacta, NO borra nada.
+  var bloqueado = false;
+  try { setupReiniciarParaEntrega('borrar todo'); } catch (e) { bloqueado = true; }
+  assert_(bloqueado, 'sin la confirmación exacta se niega a ejecutar');
+  assert_(catalogoListar_().length > 0, 'tras el intento bloqueado los datos siguen intactos');
+
+  var r = setupReiniciarParaEntrega('BORRAR TODO');
+  assert_(r.ok, 'con la confirmación exacta el reinicio se ejecuta');
+
+  assert_(catalogoListar_().length === 0, 'productos vacíos tras el reinicio');
+  assert_(dbReadAll_('MOVIMIENTOS').length === 0, 'movimientos vacíos tras el reinicio');
+  assert_(usuariosListar_().length === 0, 'usuarios vacíos tras el reinicio');
+  assert_(dbReadAll_('HISTORIAL_CATALOGO').length === 0, 'historial vacío tras el reinicio');
+
+  Object.keys(CONFIG.IDS).forEach(function (entityKey) {
+    var counterKey = CONFIG.IDS[entityKey].counterKey;
+    assert_(utilToInt(dbGetConfigValue_(counterKey)) === 0,
+      'contador ' + counterKey + ' quedó en cero');
+  });
+
+  var params = parametrosObtener_();
+  assert_(params.stock_minimo === PARAM_STOCK_MINIMO_DEFECTO &&
+    params.backup_retencion_dias === PARAM_BACKUP_RETENCION_DEFECTO &&
+    params.mov_limite === PARAM_MOV_LIMITE_DEFECTO,
+    'parámetros operativos de vuelta a fábrica');
+
+  // La base queda usable: se puede crear la cuenta de jefatura del cliente.
+  var uid = setupCrearUsuarioJefatura('Jefe Cliente', 'jefe.cliente', '135790');
+  assert_(/^USR-\d+$/.test(uid), 'tras el reinicio se puede crear la jefatura del cliente');
+  assert_(dbFindById_('USUARIOS', uid).usuario_id === uid, 'la cuenta creada existe');
 }
 
 /**

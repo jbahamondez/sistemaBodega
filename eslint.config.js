@@ -76,6 +76,9 @@ const projectGlobals = {
   // Parametros.gs
   parametrosObtener_: 'readonly',
   parametrosGuardar_: 'readonly',
+  PARAM_STOCK_MINIMO_DEFECTO: 'readonly',
+  PARAM_BACKUP_RETENCION_DEFECTO: 'readonly',
+  PARAM_MOV_LIMITE_DEFECTO: 'readonly',
   // Historial.gs
   histRegistrar_: 'readonly',
   histRegistrarCambios_: 'readonly',
@@ -197,6 +200,7 @@ const projectGlobals = {
   // Setup.gs
   setupDatabase: 'readonly',
   setupCrearUsuarioJefatura: 'readonly',
+  setupReiniciarParaEntrega: 'readonly',
   // SelfTest.gs
   assert_: 'readonly',
   runMovimientoTests: 'readonly',
