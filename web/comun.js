@@ -20,6 +20,22 @@ window.uuid = function () {
     Math.random().toString(36).slice(2, 10);
 };
 
+/**
+ * Limpia un código escaneado igual que utilNormalizeBarcode en el servidor:
+ * quita el identificador de simbología AIM (p. ej. "]C1"/"[C1" en códigos
+ * GS1-128) y corchetes/paréntesis sueltos al inicio o final. Debe aplicarse
+ * al escanear para que el código coincida con el guardado, tanto en la
+ * búsqueda con servidor como en la búsqueda offline (que ocurre solo en el
+ * navegador). Los códigos normales no cambian.
+ */
+window.normalizarCodigo = function (codigo) {
+  return String(codigo === null || codigo === undefined ? '' : codigo)
+    .trim()
+    .replace(/^[[\]][A-Za-z][0-9]/, '')
+    .replace(/^[[\](){}]+/, '')
+    .replace(/[[\](){}]+$/, '');
+};
+
 (function () {
   'use strict';
 

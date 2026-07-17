@@ -924,3 +924,34 @@ El flujo de entrega queda: `setupReiniciarParaEntrega("BORRAR TODO")` →
 Nota: la cuenta de prueba con movimientos no se puede eliminar desde el
 panel (la trazabilidad lo impide, solo desactivar); este reinicio sí la
 elimina de verdad porque borra la hoja Usuarios completa.
+
+## D-051 — Limpieza del "ruido" del lector en códigos GS1-128
+
+Reportado por el usuario: registró la EAN CAJA `01030469232998071526123110L4515`
+pero al escanearla con la cámara del celular decía "no registrado". El dato
+clave fue el valor que devolvía el escáner: `[C101030469232998071526123110L4515)`
+— el contenido es idéntico, pero con `[C1` al inicio y `)` al final.
+
+Causa: es un código **GS1-128** (los que traen las cajas con GTIN + lote +
+vencimiento adentro). Los lectores anteponen el **identificador de simbología
+AIM** `]C1` (que en este dispositivo llega como `[C1`) y a veces agregan
+paréntesis. Ese ruido hacía que el código escaneado no coincidiera con el
+guardado.
+
+Fix: `utilNormalizeBarcode` (Utils.gs) ahora quita el identificador de
+simbología al inicio (`[`/`]` + letra + dígito) y los corchetes/paréntesis
+sueltos al inicio o final. Se aplica igual al importar y al buscar, así el
+código guardado y el escaneado quedan idénticos. Los códigos normales
+(EAN-13, etc.) no se ven afectados porque no empiezan con corchete ni
+terminan en paréntesis. En el cliente se agregó `window.normalizarCodigo`
+(comun.js) con la misma lógica, aplicada al escanear en retiro.html e
+ingreso.html, para que la búsqueda offline (que ocurre solo en el navegador)
+y la deduplicación del carro también coincidan. No requiere reimportar: el
+valor guardado ya equivale al escaneado normalizado. Pruebas:
+`testBarcodePreservesLeadingZeros_` (casos con ruido) y `testImportEanCaja_`
+(escaneo con prefijo encuentra el producto).
+
+CAVEAT documentado para el usuario (no resuelto por este fix): un código
+GS1-128 con AI(10) lote y AI(15) vencimiento es distinto en cada caja según
+su lote/fecha, así que registrar la cadena completa solo hace coincidir las
+cajas de ESE lote. Solo el GTIN (AI 01) es constante por producto.

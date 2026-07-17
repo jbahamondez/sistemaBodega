@@ -416,6 +416,9 @@ function agregarManual() {
 }
 
 function procesarCodigo(codigo) {
+  // Limpia el ruido del lector (prefijo de simbología, paréntesis) antes de
+  // buscar y de comparar contra el carro y el catálogo offline (D-051).
+  codigo = normalizarCodigo(codigo);
   var existente = carro.filter(function (i) { return i.codigo_barras === codigo; })[0];
   if (existente) {
     existente.cantidad += 1;

@@ -209,6 +209,9 @@ campo.addEventListener('keydown', function (ev) {
 
 // ------------------------------- escaneo -----------------------------------
 function agregarEscaneo(codigo) {
+  // Limpia el ruido del lector (prefijo de simbología, paréntesis) antes de
+  // buscar y de comparar contra el carro (D-051).
+  codigo = normalizarCodigo(codigo);
   var existente = carro.filter(function (i) { return i.codigo_barras === codigo; })[0];
   if (existente) {
     existente.cantidad += 1;

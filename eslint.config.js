@@ -250,6 +250,7 @@ module.exports = [
         Sesion: 'readonly',
         Ui: 'readonly',
         uuid: 'readonly',
+        normalizarCodigo: 'readonly',
         clearTimeout: 'readonly',
         setInterval: 'readonly'
       }

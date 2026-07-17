@@ -17,9 +17,23 @@ function utilTrim(value) {
  * Normaliza un código de barras: siempre texto, sin espacios en los bordes.
  * Nunca convertir a número: se perderían ceros iniciales y códigos largos
  * pasarían a notación científica.
+ *
+ * Además limpia el "ruido" que algunos lectores (cámara Android / GS1-128)
+ * anteponen o agregan al dato real:
+ *  - Identificador de simbología AIM al inicio, p. ej. "]C1" (que a veces
+ *    llega como "[C1") en códigos GS1-128. Es 3 caracteres: corchete +
+ *    letra + dígito.
+ *  - Corchetes o paréntesis sueltos al inicio o al final (no forman parte
+ *    del código impreso; el lector los agrega alrededor del dato).
+ * Se aplica igual al importar y al escanear, así el código guardado y el
+ * leído quedan idénticos y coinciden. Los códigos normales (EAN-13, etc.)
+ * no se ven afectados: no empiezan con corchete ni terminan en paréntesis.
  */
 function utilNormalizeBarcode(value) {
-  return utilTrim(value);
+  var s = utilTrim(value);
+  s = s.replace(/^[[\]][A-Za-z][0-9]/, '');       // identificador de simbología AIM
+  s = s.replace(/^[[\](){}]+/, '').replace(/[[\](){}]+$/, ''); // corchetes/paréntesis sueltos
+  return s;
 }
 
 /**

@@ -67,6 +67,18 @@ function testBarcodePreservesLeadingZeros_() {
   assert_(valIsCodigoBarras(codigo), 'código con ceros iniciales es válido');
   assert_(!valIsCodigoBarras(''), 'código vacío es inválido');
   assert_(!valIsCodigoBarras('12 34'), 'código con espacio interno es inválido');
+
+  // D-051: el lector antepone el identificador de simbología AIM ("]C1", que
+  // llega como "[C1") y a veces agrega paréntesis a códigos GS1-128. El
+  // código guardado (sin ese ruido) y el escaneado deben coincidir.
+  assert_(utilNormalizeBarcode('[C101030469232998071526123110L4515)') ===
+    '01030469232998071526123110L4515',
+    'D-051: quita el prefijo de simbología [C1 y el paréntesis final');
+  assert_(utilNormalizeBarcode(']C17801234567890') === '7801234567890',
+    'D-051: quita el prefijo de simbología ]C1');
+  // Un código normal no debe verse afectado por la limpieza.
+  assert_(utilNormalizeBarcode('7801234567890') === '7801234567890',
+    'D-051: un EAN normal queda intacto');
 }
 
 function testUtilBool_() {
@@ -678,6 +690,12 @@ function testImportEanCaja_() {
   assert_(sinEan && sinEan.producto.nombre === 'Turron Sin Ean' &&
     utilToInt(sinEan.formato.unidades_por_empaque) === 12,
     'D-048: con EAN vacío, el EAN CAJA pasa a ser el código principal');
+
+  // D-051: escanear el código de caja CON el ruido del lector ("]C1"+...) lo
+  // encuentra igual (el prefijo de simbología se limpia en la búsqueda).
+  var conRuido = movBuscarCodigo_(']C1DUAL780999');
+  assert_(conRuido.encontrado && conRuido.producto_nombre === 'Trufa Doble Codigo',
+    'D-051: el código escaneado con prefijo de simbología encuentra el producto');
 
   // Reimportar la misma planilla no duplica nada: todo SIN_CAMBIOS.
   var prev2 = importacionPrevisualizar_(csv, 'AGREGAR_Y_ACTUALIZAR');
