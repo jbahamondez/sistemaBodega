@@ -28,12 +28,22 @@ function utilTrim(value) {
  * Se aplica igual al importar y al escanear, así el código guardado y el
  * leído quedan idénticos y coinciden. Los códigos normales (EAN-13, etc.)
  * no se ven afectados: no empiezan con corchete ni terminan en paréntesis.
+ *
+ * GS1-128 (cajas, D-052): estos códigos llevan el GTIN del producto JUNTO
+ * con el lote y el vencimiento, y el lote/vencimiento cambian caja a caja.
+ * Se extrae SOLO el GTIN (identificador de aplicación 01: 14 dígitos al
+ * inicio), la única parte estable, para que todas las cajas de un producto
+ * se reconozcan por el mismo código sin importar su lote o fecha. No es un
+ * parser GS1 completo: asume el GTIN al comienzo (caso estándar). Los
+ * códigos normales son demasiado cortos para calzar con "01 + 14 dígitos",
+ * así que pasan intactos (un EAN-13 tiene 13 dígitos; un GTIN-14 suelto, 14).
  */
 function utilNormalizeBarcode(value) {
   var s = utilTrim(value);
   s = s.replace(/^[[\]][A-Za-z][0-9]/, '');       // identificador de simbología AIM
   s = s.replace(/^[[\](){}]+/, '').replace(/[[\](){}]+$/, ''); // corchetes/paréntesis sueltos
-  return s;
+  var gtin = s.match(/^01(\d{14})/);              // GS1-128: AI 01 + GTIN de 14 dígitos
+  return gtin ? gtin[1] : s;
 }
 
 /**

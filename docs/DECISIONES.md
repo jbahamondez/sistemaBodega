@@ -955,3 +955,37 @@ CAVEAT documentado para el usuario (no resuelto por este fix): un código
 GS1-128 con AI(10) lote y AI(15) vencimiento es distinto en cada caja según
 su lote/fecha, así que registrar la cadena completa solo hace coincidir las
 cajas de ESE lote. Solo el GTIN (AI 01) es constante por producto.
+
+## D-052 — GS1-128: identificar la caja solo por su GTIN
+
+Continuación de D-051. El usuario confirmó que, tras limpiar el ruido del
+lector, escanear la MISMA caja funciona; pero una caja de otro lote no
+coincidiría, porque D-051 seguía guardando/comparando la cadena completa
+(GTIN + lote + vencimiento). Se ofrecieron opciones y el usuario eligió la
+A: identificar la caja por su GTIN.
+
+Un GS1-128 concatena varios datos, cada uno precedido por su "identificador
+de aplicación" (AI): `01`=GTIN (14 díg.), `15`/`17`=vencimiento (AAMMDD),
+`10`=lote (alfanumérico). Del ejemplo `01030469232998071526123110L4515`:
+GTIN `03046923299807`, vencimiento 2026-12-31, lote L4515. Solo el GTIN se
+repite en todas las cajas del producto.
+
+Fix: `utilNormalizeBarcode` (Utils.gs) y `window.normalizarCodigo`
+(comun.js), tras la limpieza de ruido de D-051, extraen el GTIN cuando el
+código calza con `^01(\d{14})` (AI 01 + 14 dígitos al inicio) y devuelven
+solo esos 14 dígitos; si no calza, devuelven el código limpio tal cual. No
+es un parser GS1 completo: asume el GTIN al inicio (caso estándar). Como se
+aplica igual al importar, buscar, confirmar y escanear (online y offline),
+la caja queda registrada por su GTIN y cualquier caja del producto —sin
+importar lote o fecha— coincide. Los códigos normales no se afectan: un
+EAN-13 (13 díg.) o un GTIN-14 suelto (14 díg.) son demasiado cortos para
+calzar con "01 + 14 dígitos". La función es idempotente (un GTIN ya extraído
+queda igual). Pruebas: `testBarcodePreservesLeadingZeros_` (extracción de
+GTIN, prefijo, idempotencia, códigos normales intactos) y `testImportGs1Caja_`
+(una caja de otro lote/fecha se reconoce por el mismo GTIN).
+
+Migración: los productos ya importados con la cadena GS1-128 completa como
+código de caja siguen guardando ese string; para que respondan al nuevo
+comportamiento hay que reimportar la planilla (o partir de la base limpia
+del reinicio de entrega, D-050, que es lo que hará el usuario antes de
+entregar).

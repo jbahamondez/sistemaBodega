@@ -27,13 +27,19 @@ window.uuid = function () {
  * al escanear para que el código coincida con el guardado, tanto en la
  * búsqueda con servidor como en la búsqueda offline (que ocurre solo en el
  * navegador). Los códigos normales no cambian.
+ *
+ * En los GS1-128 de las cajas extrae SOLO el GTIN (AI 01, 14 dígitos): así
+ * una caja se reconoce sin importar su lote o vencimiento (D-052). Debe
+ * quedar idéntica a utilNormalizeBarcode del servidor.
  */
 window.normalizarCodigo = function (codigo) {
-  return String(codigo === null || codigo === undefined ? '' : codigo)
+  var s = String(codigo === null || codigo === undefined ? '' : codigo)
     .trim()
     .replace(/^[[\]][A-Za-z][0-9]/, '')
     .replace(/^[[\](){}]+/, '')
     .replace(/[[\](){}]+$/, '');
+  var gtin = s.match(/^01(\d{14})/);
+  return gtin ? gtin[1] : s;
 };
 
 (function () {

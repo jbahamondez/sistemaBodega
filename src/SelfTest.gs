@@ -69,16 +69,31 @@ function testBarcodePreservesLeadingZeros_() {
   assert_(!valIsCodigoBarras('12 34'), 'código con espacio interno es inválido');
 
   // D-051: el lector antepone el identificador de simbología AIM ("]C1", que
-  // llega como "[C1") y a veces agrega paréntesis a códigos GS1-128. El
-  // código guardado (sin ese ruido) y el escaneado deben coincidir.
-  assert_(utilNormalizeBarcode('[C101030469232998071526123110L4515)') ===
-    '01030469232998071526123110L4515',
-    'D-051: quita el prefijo de simbología [C1 y el paréntesis final');
+  // llega como "[C1") y a veces agrega paréntesis. Se limpia ese ruido.
   assert_(utilNormalizeBarcode(']C17801234567890') === '7801234567890',
     'D-051: quita el prefijo de simbología ]C1');
-  // Un código normal no debe verse afectado por la limpieza.
+
+  // D-052: en un GS1-128 de caja (GTIN + vencimiento + lote) se extrae SOLO
+  // el GTIN (AI 01, 14 dígitos), así todas las cajas del producto coinciden
+  // sin importar lote ni fecha. El código de ejemplo lleva GTIN
+  // 03046923299807, vencimiento 261231 (AI 15) y lote L4515 (AI 10).
+  assert_(utilNormalizeBarcode('[C101030469232998071526123110L4515)') ===
+    '03046923299807',
+    'D-052: del GS1-128 con ruido extrae solo el GTIN');
+  assert_(utilNormalizeBarcode('01030469232998071526123110L4515') === '03046923299807',
+    'D-052: extrae el GTIN aunque el código venga sin prefijo');
+  // Misma caja, OTRO lote y vencimiento (AI 17 270101, lote L9999) → mismo GTIN.
+  assert_(utilNormalizeBarcode('01030469232998071727010110L9999') === '03046923299807',
+    'D-052: otra caja del mismo producto (distinto lote/fecha) da el mismo GTIN');
+  // Idempotente: normalizar un GTIN ya extraído lo deja igual.
+  assert_(utilNormalizeBarcode('03046923299807') === '03046923299807',
+    'D-052: un GTIN ya limpio queda igual (idempotente)');
+
+  // Los códigos normales no se ven afectados (demasiado cortos para el patrón).
   assert_(utilNormalizeBarcode('7801234567890') === '7801234567890',
-    'D-051: un EAN normal queda intacto');
+    'D-052: un EAN-13 normal queda intacto');
+  assert_(utilNormalizeBarcode(' 001234567890 ') === '001234567890',
+    'D-052: un código con ceros iniciales queda intacto');
 }
 
 function testUtilBool_() {
@@ -186,7 +201,7 @@ function runMovimientoTests() {
     testIdempotencia_, testFormulaInjection_,
     testAjusteReversa_, testMovLimite_, testPendientesAntiguos_,
     testEliminarCatalogo_, testParametros_, testPanelMetricas_, testCatalogoOffline_,
-    testImportEanCaja_,
+    testImportEanCaja_, testImportGs1Caja_,
     testReinicioEntrega_]; // DEBE ir al final: vacía toda la base de prueba.
   tests.forEach(function (t) {
     try {
@@ -707,6 +722,32 @@ function testImportEanCaja_() {
   var prevIgual = importacionPrevisualizar_(csvIgual, 'AGREGAR_Y_ACTUALIZAR');
   assert_(prevIgual.resumen.NUEVO === 1,
     'D-048: EAN y EAN CAJA idénticos generan un solo formato, sin duplicado');
+}
+
+/**
+ * D-052: una caja registrada con un código GS1-128 (que trae GTIN + lote +
+ * vencimiento) se reconoce escaneando OTRA caja del mismo producto, con
+ * distinto lote y fecha, porque solo se guarda y compara el GTIN.
+ */
+function testImportGs1Caja_() {
+  var cab = 'Cod producto,Descripcion del producto (Nombre),EAN,EAN CAJA,Cantidad\n';
+  // EAN CAJA = GS1-128 real: GTIN 03046923299807, vencimiento 261231, lote L4515.
+  var csv = cab + 'GS1-01,Chocolate GS1,GS1780111,01030469232998071526123110L4515,6\n';
+
+  var res = importacionAplicar_(csv, 'AGREGAR_Y_ACTUALIZAR', 'gs1.csv');
+  assert_(res.detalle.formatosCreados === 2,
+    'D-052: se crean el formato base y el de caja');
+
+  // La caja quedó registrada por su GTIN, no por el string completo.
+  assert_(catalogoBuscarPorCodigoBarras_('03046923299807') !== null,
+    'D-052: la caja se guarda por el GTIN extraído');
+  assert_(catalogoBuscarPorCodigoBarras_('01030469232998071526123110L4515') !== null,
+    'D-052: escanear el mismo código completo también la encuentra (se normaliza al GTIN)');
+
+  // OTRA caja del mismo producto: distinto lote (L9999) y vencimiento (270101).
+  var otraCaja = movBuscarCodigo_('01030469232998071727010110L9999');
+  assert_(otraCaja.encontrado && otraCaja.producto_nombre === 'Chocolate GS1',
+    'D-052: una caja de otro lote/fecha se reconoce por el mismo GTIN');
 }
 
 /**
