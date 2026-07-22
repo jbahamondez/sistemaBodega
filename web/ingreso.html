@@ -36,6 +36,16 @@
     margin-left: .35rem; }
   .navbar nav a.salir:hover { background: rgba(198,40,40,.4); border-color: transparent; }
 
+  /* Responsive: mejora el navbar en dispositivos móviles (Android, etc.) */
+  @media (max-width: 767px) {
+    .navbar { flex-direction: column; gap: 0.5rem; padding: 0.5rem 1rem; }
+    .navbar .marca { flex: 1 0 100%; justify-content: center; text-align: center; }
+    .navbar nav { width: 100%; justify-content: center; gap: 0.5rem; }
+    .navbar nav a { padding: 0.65rem 1rem; font-size: 0.95rem; min-height: 44px; display: flex; align-items: center; }
+    .navbar nav a.salir { margin-left: 0; }
+    main { padding: 0.75rem 0.8rem 2rem; }
+  }
+
   .panel { background: #fff; border: 1px solid var(--borde); border-radius: 8px;
     padding: 1rem; margin-bottom: 1rem; overflow-x: auto; }
   .panel h2 { margin: 0 0 .8rem; font-size: 1.02rem; color: var(--marron); }
