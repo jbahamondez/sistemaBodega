@@ -12,6 +12,7 @@
 /**
  * Menú hamburguesa: toggle del menú desplegable en móvil.
  * Agrega/quita la clase 'activo' al navbar-menu para mostrar/ocultar.
+ * También cierra el menú cuando se hace click en un enlace.
  */
 window.toggleNavbarMenu = function () {
   var menu = document.querySelector('.navbar-menu');
@@ -19,6 +20,44 @@ window.toggleNavbarMenu = function () {
     menu.classList.toggle('activo');
   }
 };
+
+/**
+ * Cerrar el menú hamburguesa.
+ */
+window.closeNavbarMenu = function () {
+  var menu = document.querySelector('.navbar-menu');
+  if (menu) {
+    menu.classList.remove('activo');
+  }
+};
+
+/**
+ * Inicializar el menú hamburguesa: cerrar cuando se hace click en un link
+ * o fuera del navbar.
+ */
+(function () {
+  // Cerrar menú cuando se hace click en un link del menú
+  document.addEventListener('click', function (e) {
+    var menu = document.querySelector('.navbar-menu');
+    var toggle = document.querySelector('.navbar-toggle');
+    
+    if (!menu || !toggle) return;
+    
+    // Si se hace click en un link dentro del menú, cerrar el menú
+    if (menu.contains(e.target) && e.target.tagName === 'A') {
+      menu.classList.remove('activo');
+    }
+    
+    // Si se hace click fuera del navbar (pero en móvil), cerrar el menú
+    if (!menu.closest('.navbar').contains(e.target) && menu.classList.contains('activo')) {
+      // Solo cerrar si la ventana es menor a 767px (móvil)
+      if (window.innerWidth <= 767) {
+        menu.classList.remove('activo');
+      }
+    }
+  });
+})();
+
 
 /**
  * Identificador único para claves de idempotencia de operaciones (C2).
