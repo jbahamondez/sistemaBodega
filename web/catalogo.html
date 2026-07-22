@@ -36,14 +36,22 @@
   .navbar nav a.salir { border: 1px solid rgba(255,217,179,.55); color: #ffd9b3;
     margin-left: .35rem; }
   .navbar nav a.salir:hover { background: rgba(198,40,40,.4); border-color: transparent; }
+  .navbar-toggle { display: none; background: none; border: none; color: #efebe9;
+    font-size: 1.5rem; cursor: pointer; padding: .5rem .8rem; transition: opacity .15s; }
+  .navbar-toggle:active { opacity: .7; }
 
-  /* Responsive: mejora el navbar en dispositivos móviles (Android, etc.) */
+  /* Responsive: menú hamburguesa en móvil */
   @media (max-width: 767px) {
-    .navbar { flex-direction: column; gap: 0.5rem; padding: 0.5rem 1rem; }
-    .navbar .marca { flex: 1 0 100%; justify-content: center; text-align: center; }
-    .navbar nav { width: 100%; justify-content: center; gap: 0.5rem; }
-    .navbar nav a { padding: 0.65rem 1rem; font-size: 0.95rem; min-height: 44px; display: flex; align-items: center; }
-    .navbar nav a.salir { margin-left: 0; }
+    .navbar { flex-wrap: nowrap; gap: .3rem; padding: .6rem 1rem; }
+    .navbar .marca { flex: 1; }
+    .navbar-toggle { display: block; }
+    .navbar-menu { position: absolute; top: 100%; left: 0; right: 0; width: 100%;
+      flex-direction: column; background: rgba(62, 39, 35, 0.95); gap: 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.1); display: none; }
+    .navbar-menu.activo { display: flex; }
+    .navbar-menu a { width: 100%; padding: .8rem 1rem; border-radius: 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+    .navbar-menu a:last-child { border-bottom: none; }
     main { padding: 0.75rem 0.8rem 2rem; }
   }
 
@@ -138,7 +146,8 @@
     <span class="logo">🍫</span>
     <span class="titulos"><strong>Sistema Bodega</strong><small>Catálogo</small></span>
   </a>
-  <nav>
+  <button class="navbar-toggle" onclick="toggleNavbarMenu()">☰</button>
+  <nav class="navbar-menu">
     <a href="index.html">Inicio</a>
     <a href="ingreso.html">Ingreso</a>
     <a href="catalogo.html" class="activo">Catálogo</a>

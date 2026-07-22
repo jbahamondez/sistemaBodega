@@ -10,6 +10,17 @@
 /* global API_URL */
 
 /**
+ * Menú hamburguesa: toggle del menú desplegable en móvil.
+ * Agrega/quita la clase 'activo' al navbar-menu para mostrar/ocultar.
+ */
+window.toggleNavbarMenu = function () {
+  var menu = document.querySelector('.navbar-menu');
+  if (menu) {
+    menu.classList.toggle('activo');
+  }
+};
+
+/**
  * Identificador único para claves de idempotencia de operaciones (C2).
  * Usa crypto.randomUUID cuando está disponible; si no, un fallback simple
  * (suficiente: solo necesita ser único por dispositivo/operación).
